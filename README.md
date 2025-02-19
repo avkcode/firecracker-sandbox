@@ -79,6 +79,28 @@ make up
 make down
 ```
 
+## Ensuring Network Functionality in the VM
+After starting the Firecracker MicroVM, you need to configure networking inside the VM to ensure it has internet access and proper DNS resolution. Follow these steps:
+
+1. Configure Networking Inside the VM
+Once the VM starts, log in via SSH or the serial console and run the following commands:
+```
+# Assign an IP address to the eth0 interface
+ip addr add 192.168.1.2/24 dev eth0
+
+# Bring up the eth0 interface
+ip link set eth0 up
+
+# Add a default route via the gateway (host's tap0 IP)
+ip route add default via 192.168.1.1
+
+# Configure DNS servers
+tee /etc/resolv.conf <<EOF
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+EOF
+```
+
 ## Notes
 
 - Ensure that `config.json` is properly configured for your Firecracker MicroVM.

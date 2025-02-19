@@ -1,2 +1,4 @@
-vmlinux
+*vmlinux*
 *.ext4
+wget-log
+*debian-rootfs*

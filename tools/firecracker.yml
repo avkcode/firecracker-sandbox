@@ -1,0 +1,26 @@
+kernel:
+  image: linuxkit/kernel:6.6.71
+  cmdline: "console=ttyS0 reboot=k panic=1 pci=off"
+
+init:
+  - linuxkit/init:v0.8
+  - linuxkit/runc:v0.8
+  - linuxkit/containerd:v0.8
+
+onboot:
+  - name: sysctl
+    image: linuxkit/sysctl:v0.8
+  - name: dhcpcd
+    image: linuxkit/dhcpcd:v0.8
+    command: ["/sbin/dhcpcd", "--nobackground", "-f", "/dhcpcd.conf", "-1"]
+
+services:
+  - name: getty
+    image: linuxkit/getty:v0.8
+    env:
+      - INSECURE=true
+
+files:
+  - path: etc/getty.tab
+    contents: |
+      ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Variables
-KERNEL_VERSION="6.13.3"
+KERNEL_VERSION="6.11"
 KERNEL_URL="https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz"
 KERNEL_DIR="linux-${KERNEL_VERSION}"
 KERNEL_ARCHIVE="linux-${KERNEL_VERSION}.tar.xz"

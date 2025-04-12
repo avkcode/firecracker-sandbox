@@ -65,3 +65,19 @@ Command Line Options:
 | --executor      | Runner executor type                         | `"shell"`              |
 | --docker-image  | Default Docker image                         | `"alpine:latest"`      |
 | --force         | Force reinstall                              | `False`                |
+
+## Jenkins Agent Installation Script
+
+### Basic installation
+sudo ./install_jenkins_agent.py agent1 https://jenkins.example.com <secret>
+
+### With custom options
+sudo ./install_jenkins_agent.py \
+    agent1 \
+    https://jenkins.example.com \
+    <secret> \
+    --agent-dir /opt/my-jenkins-agent \
+    --user myagent \
+    --java-opts "-Xmx2g -Xms512m" \
+    --force
+

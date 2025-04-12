@@ -35,17 +35,13 @@ deactivate:
 .PHONY: net-up
 net-up:
 	@echo "Setting up networking for Firecracker MicroVM..."
-	# Step 1: Create a tap device on the host system
 	@echo "Creating tap0 device..."
 	@sudo ip tuntap add tap0 mode tap || true
 	@sudo ip link set tap0 up
-	# Step 2: Assign an IP address to the tap0 device
 	@echo "Assigning IP address to tap0..."
 	@sudo ip addr add 192.168.1.1/24 dev tap0 || true
-	# Step 3: Enable IP forwarding on the host system
 	@echo "Enabling IP forwarding..."
 	@sudo sysctl -w net.ipv4.ip_forward=1
-	# Step 4: Set up NAT using iptables with a dedicated chain
 	@echo "Setting up NAT with iptables..."
 	@sudo iptables -t nat -N FIRECRACKER-NAT || true
 	@sudo iptables -t nat -A FIRECRACKER-NAT -o $(shell ip route | grep default | awk '{print $$5}') -j MASQUERADE
@@ -72,9 +68,8 @@ net-down:
 	@echo "Networking cleanup complete."
 	
 .PHONY: up
-up:
+up: down net-down net-up
 	@echo "Starting Firecracker MicroVM..."
-	# Step 1: Start Firecracker in the background
 	@echo "Launching Firecracker..."
 	@firecracker --api-sock /tmp/firecracker.socket --config-file vm-config.json
 
@@ -89,9 +84,7 @@ down:
 .PHONY: login
 login:
 	@echo "Attempting to log into the running MicroVM..."
-	# Step 1: Check if Firecracker is running
 	@ps aux | grep '[f]irecracker' > /dev/null || (echo "Firecracker is not running. Start the VM first." && exit 1)
-	# Step 2: Try connecting via serial console
 	@echo "Connecting to the MicroVM via serial console..."
 	@screen /dev/ttyS0 115200 || true
 	@echo "Login attempt complete."

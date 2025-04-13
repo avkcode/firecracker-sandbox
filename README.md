@@ -21,6 +21,15 @@ This project provides a set of `Makefile` targets to simplify the setup, managem
 
 ## Usage
 
+Firecracker requires bootable rootfs image and Linux Kernel. To create rootfs and download prebuilt Kernel execute `create-debian-rootfs.sh` script:
+```bash
+bash tools/create-debian-rootfs.sh
+```
+It should produce `firecracker-rootfs.ext4` and `vmlinux` files.
+`vm-config.json` is used for VM boot options.
+
+If you want to compile custom Kernel use tools\download-and-build-kernel.sh script.
+
 ### 1. Set Up Networking
 ```bash
 make net-up

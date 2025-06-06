@@ -71,24 +71,43 @@ python3 firecracker_cli.py --help
 ```
 Displays available commands and their descriptions.
 
+### Global Options
+
+These options can be used with any command to customize the behavior:
+
+| Option           | Description                                      | Default Value        |
+|------------------|--------------------------------------------------|----------------------|
+| `--socket-path`  | Path to the Firecracker API socket               | /tmp/firecracker.socket |
+| `--tap-device`   | Name of the TAP device to use                    | tap0                 |
+| `--tap-ip`       | IP address for the TAP device                    | 192.168.1.1          |
+| `--tap-netmask`  | Netmask for the TAP device                       | 24                   |
+| `--guest-ip`     | IP address for the guest VM                      | 192.168.1.2          |
+| `--verbose`, `-v`| Enable verbose output                            | False                |
+| `--dry-run`      | Print commands without executing them            | False                |
+
 ### Command-line Commands
 
-| Command      | Description                                                  |
-|--------------|--------------------------------------------------------------|
-| `activate`   | Create and activate the Firecracker API socket               |
-| `deactivate` | Deactivate and clean up the Firecracker API socket           |
-| `net-up`     | Set up networking for Firecracker MicroVM                    |
-| `net-down`   | Clean up networking resources                                |
-| `start`      | Start the Firecracker MicroVM                                |
-| `stop`       | Stop all Firecracker instances and clean up resources        |
-| `login`      | Attempt to log into the running MicroVM via serial console   |
-| `setup`      | Set up everything and start the MicroVM (net-up + activate + start) |
-| `teardown`   | Stop the MicroVM and clean up all resources (stop + net-down + deactivate) |
+| Command              | Description                                                  |
+|----------------------|--------------------------------------------------------------|
+| `activate`           | Create and activate the Firecracker API socket               |
+| `deactivate`         | Deactivate and clean up the Firecracker API socket           |
+| `net-up`             | Set up networking for Firecracker MicroVM                    |
+| `net-down`           | Clean up networking resources                                |
+| `start`              | Start the Firecracker MicroVM                                |
+| `stop`               | Stop all Firecracker instances and clean up resources        |
+| `login`              | Attempt to log into the running MicroVM via serial console   |
+| `setup`              | Set up everything and start the MicroVM                      |
+| `teardown`           | Stop the MicroVM and clean up all resources                  |
+| `generate-guest-config` | Generate a network configuration script for the guest VM  |
+| `show-config`        | Show the current configuration                               |
 
-#### Options for `start` command
-| Option          | Description                                                 |
-|-----------------|-------------------------------------------------------------|
-| `--config-file` | Path to the VM configuration file (default: vm-config.json) |
+#### Command-specific Options
+
+| Command    | Option          | Description                                                 |
+|------------|-----------------|-------------------------------------------------------------|
+| `start`    | `--config-file` | Path to the VM configuration file (default: vm-config.json) |
+| `setup`    | `--config-file` | Path to the VM configuration file (default: vm-config.json) |
+| `generate-guest-config` | `--output`, `-o` | Output file for the guest network configuration script (default: guest-network-setup.sh) |
 
 ## Example Workflows
 
@@ -112,6 +131,24 @@ sudo python3 firecracker_cli.py activate
 
 # Start with custom configuration
 sudo python3 firecracker_cli.py start --config-file my-custom-config.json
+```
+
+### Using Custom Network Configuration
+```bash
+# Use a different TAP device and IP range
+sudo python3 firecracker_cli.py --tap-device tap1 --tap-ip 192.168.2.1 --guest-ip 192.168.2.2 setup
+
+# Generate a network configuration script for the guest VM
+sudo python3 firecracker_cli.py --guest-ip 192.168.2.2 --tap-ip 192.168.2.1 generate-guest-config
+
+# Show current configuration
+sudo python3 firecracker_cli.py show-config
+```
+
+### Dry Run Mode
+```bash
+# See what commands would be executed without actually running them
+sudo python3 firecracker_cli.py --dry-run setup
 ```
 
 ## Ensuring Network Functionality in the VM

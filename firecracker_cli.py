@@ -13,8 +13,34 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Dict, Any, List, Optional, Callable
 
 import click
+
+
+class Config:
+    """Configuration class to store global settings."""
+    def __init__(self):
+        self.socket_path = "/tmp/firecracker.socket"
+        self.tap_device = "tap0"
+        self.tap_ip = "192.168.1.1"
+        self.tap_netmask = "24"
+        self.guest_ip = "192.168.1.2"
+        self.verbose = False
+        self.dry_run = False
+        
+    def __str__(self) -> str:
+        """Return string representation of config."""
+        return (f"Config(socket_path={self.socket_path}, "
+                f"tap_device={self.tap_device}, "
+                f"tap_ip={self.tap_ip}/{self.tap_netmask}, "
+                f"guest_ip={self.guest_ip}, "
+                f"verbose={self.verbose}, "
+                f"dry_run={self.dry_run})")
+
+
+# Global configuration object
+config = Config()
 
 
 class Colors:
@@ -50,7 +76,20 @@ def run_command(cmd, check=True, shell=False, capture_output=False):
         if isinstance(cmd, list) and shell:
             cmd = " ".join(cmd)
         
-        print_color(f"Running: {cmd if isinstance(cmd, str) else ' '.join(cmd)}", Colors.BLUE)
+        cmd_str = cmd if isinstance(cmd, str) else ' '.join(cmd)
+        
+        if config.verbose:
+            print_color(f"Running: {cmd_str}", Colors.BLUE)
+        
+        if config.dry_run:
+            print_color(f"[DRY RUN] Would execute: {cmd_str}", Colors.YELLOW)
+            # Return a mock result for dry runs
+            class MockResult:
+                def __init__(self):
+                    self.returncode = 0
+                    self.stdout = ""
+                    self.stderr = ""
+            return MockResult()
         
         result = subprocess.run(
             cmd,
@@ -79,26 +118,24 @@ def check_root():
 def activate_socket():
     """Create and activate the Firecracker API socket."""
     print_color("Creating and activating the Firecracker API socket...", Colors.GREEN)
-    socket_path = "/tmp/firecracker.socket"
     
     # Remove existing socket if it exists
-    if os.path.exists(socket_path):
-        os.remove(socket_path)
+    if os.path.exists(config.socket_path):
+        os.remove(config.socket_path)
     
     # Create a new socket
-    run_command(["mkfifo", socket_path])
-    run_command(["chmod", "660", socket_path])
+    run_command(["mkfifo", config.socket_path])
+    run_command(["chmod", "660", config.socket_path])
     
-    print_color(f"Firecracker API socket activated at {socket_path}", Colors.GREEN)
+    print_color(f"Firecracker API socket activated at {config.socket_path}", Colors.GREEN)
 
 
 def deactivate_socket():
     """Deactivate and clean up the Firecracker API socket."""
     print_color("Deactivating and cleaning up the Firecracker API socket...", Colors.GREEN)
-    socket_path = "/tmp/firecracker.socket"
     
-    if os.path.exists(socket_path):
-        os.remove(socket_path)
+    if os.path.exists(config.socket_path):
+        os.remove(config.socket_path)
     
     print_color("Firecracker API socket deactivated and cleaned up.", Colors.GREEN)
 
@@ -108,14 +145,14 @@ def setup_networking():
     check_root()
     print_color("Setting up networking for Firecracker MicroVM...", Colors.GREEN)
     
-    # Create tap0 device
-    print_color("Creating tap0 device...", Colors.BLUE)
-    run_command(["ip", "tuntap", "add", "tap0", "mode", "tap"], check=False)
-    run_command(["ip", "link", "set", "tap0", "up"])
+    # Create tap device
+    print_color(f"Creating {config.tap_device} device...", Colors.BLUE)
+    run_command(["ip", "tuntap", "add", config.tap_device, "mode", "tap"], check=False)
+    run_command(["ip", "link", "set", config.tap_device, "up"])
     
     # Assign IP address
-    print_color("Assigning IP address to tap0...", Colors.BLUE)
-    run_command(["ip", "addr", "add", "192.168.1.1/24", "dev", "tap0"], check=False)
+    print_color(f"Assigning IP address to {config.tap_device}...", Colors.BLUE)
+    run_command(["ip", "addr", "add", f"{config.tap_ip}/{config.tap_netmask}", "dev", config.tap_device], check=False)
     
     # Enable IP forwarding
     print_color("Enabling IP forwarding...", Colors.BLUE)
@@ -144,11 +181,11 @@ def setup_networking():
     
     # Create and configure FIRECRACKER-FORWARD chain
     run_command(["iptables", "-N", "FIRECRACKER-FORWARD"], check=False)
-    run_command(["iptables", "-A", "FIRECRACKER-FORWARD", "-i", "tap0", "-j", "ACCEPT"])
-    run_command(["iptables", "-A", "FIRECRACKER-FORWARD", "-o", "tap0", "-j", "ACCEPT"])
+    run_command(["iptables", "-A", "FIRECRACKER-FORWARD", "-i", config.tap_device, "-j", "ACCEPT"])
+    run_command(["iptables", "-A", "FIRECRACKER-FORWARD", "-o", config.tap_device, "-j", "ACCEPT"])
     run_command(["iptables", "-A", "FORWARD", "-j", "FIRECRACKER-FORWARD"])
     
-    print_color("Networking setup complete. Firecracker is ready to use the tap0 device.", Colors.GREEN)
+    print_color(f"Networking setup complete. Firecracker is ready to use the {config.tap_device} device.", Colors.GREEN)
 
 
 def cleanup_networking():
@@ -156,8 +193,8 @@ def cleanup_networking():
     check_root()
     print_color("Cleaning up networking...", Colors.GREEN)
     
-    # Remove the tap0 device
-    run_command(["ip", "link", "delete", "tap0"], check=False)
+    # Remove the tap device
+    run_command(["ip", "link", "delete", config.tap_device], check=False)
     
     # Remove Firecracker-specific iptables rules
     print_color("Removing Firecracker-specific iptables rules...", Colors.BLUE)
@@ -183,7 +220,14 @@ def start_microvm(config_file="vm-config.json"):
     # Validate JSON config
     try:
         with open(config_file, 'r') as f:
-            json.load(f)
+            vm_config = json.load(f)
+            
+        # Optionally update network configuration in the VM config
+        if "network-interfaces" in vm_config:
+            for iface in vm_config["network-interfaces"]:
+                if iface.get("host_dev_name") == "tap0" and config.tap_device != "tap0":
+                    iface["host_dev_name"] = config.tap_device
+                    print_color(f"Updated network interface to use {config.tap_device}", Colors.BLUE)
     except json.JSONDecodeError:
         print_color(f"Invalid JSON in config file {config_file}", Colors.RED)
         sys.exit(1)
@@ -191,7 +235,7 @@ def start_microvm(config_file="vm-config.json"):
     # Launch Firecracker
     print_color("Launching Firecracker...", Colors.BLUE)
     firecracker_process = subprocess.Popen(
-        ["firecracker", "--api-sock", "/tmp/firecracker.socket", "--config-file", config_file],
+        ["firecracker", "--api-sock", config.socket_path, "--config-file", config_file],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
@@ -227,7 +271,7 @@ def stop_microvm():
     # Find and kill all Firecracker processes
     result = run_command(["ps", "aux"], capture_output=True)
     for line in result.stdout.splitlines():
-        if "firecracker" in line and "/tmp/firecracker.socket" in line:
+        if "firecracker" in line and config.socket_path in line:
             parts = line.split()
             pid = parts[1]
             print_color(f"Killing Firecracker process with PID {pid}", Colors.BLUE)
@@ -235,8 +279,8 @@ def stop_microvm():
     
     # Clean up socket files
     print_color("Cleaning up socket files...", Colors.BLUE)
-    if os.path.exists("/tmp/firecracker.socket"):
-        os.remove("/tmp/firecracker.socket")
+    if os.path.exists(config.socket_path):
+        os.remove(config.socket_path)
     
     print_color("Firecracker cleanup complete.", Colors.GREEN)
 
@@ -249,7 +293,7 @@ def login_to_microvm():
     result = run_command(["ps", "aux"], capture_output=True)
     firecracker_running = False
     for line in result.stdout.splitlines():
-        if "firecracker" in line and "/tmp/firecracker.socket" in line:
+        if "firecracker" in line and config.socket_path in line:
             firecracker_running = True
             break
     
@@ -270,8 +314,15 @@ def login_to_microvm():
 
 
 @click.group(invoke_without_command=True, context_settings=dict(help_option_names=['-h', '--help']))
+@click.option('--socket-path', help='Path to the Firecracker API socket', default="/tmp/firecracker.socket")
+@click.option('--tap-device', help='Name of the TAP device to use', default="tap0")
+@click.option('--tap-ip', help='IP address for the TAP device', default="192.168.1.1")
+@click.option('--tap-netmask', help='Netmask for the TAP device', default="24")
+@click.option('--guest-ip', help='IP address for the guest VM', default="192.168.1.2")
+@click.option('--verbose', '-v', is_flag=True, help='Enable verbose output')
+@click.option('--dry-run', is_flag=True, help='Print commands without executing them')
 @click.pass_context
-def cli(ctx):
+def cli(ctx, socket_path, tap_device, tap_ip, tap_netmask, guest_ip, verbose, dry_run):
     """Firecracker CLI - A tool for managing Firecracker MicroVMs.
     
     This tool provides a simple interface for setting up, starting, and stopping
@@ -287,7 +338,22 @@ def cli(ctx):
       
       # Start a MicroVM with a custom config file
       sudo firecracker_cli.py start --config-file my-config.json
+      
+      # Use a different TAP device and IP configuration
+      sudo firecracker_cli.py --tap-device tap1 --tap-ip 192.168.2.1 setup
     """
+    # Update global configuration
+    config.socket_path = socket_path
+    config.tap_device = tap_device
+    config.tap_ip = tap_ip
+    config.tap_netmask = tap_netmask
+    config.guest_ip = guest_ip
+    config.verbose = verbose
+    config.dry_run = dry_run
+    
+    if verbose:
+        print_color(f"Configuration: {config}", Colors.BLUE)
+    
     # If no command is provided, show help
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
@@ -356,6 +422,56 @@ def cmd_teardown():
     stop_microvm()
     cleanup_networking()
     deactivate_socket()
+
+
+@cli.command('generate-guest-config')
+@click.option('--output', '-o', default="guest-network-setup.sh", help="Output file for the guest network configuration script")
+def cmd_generate_guest_config(output):
+    """Generate a network configuration script for the guest VM."""
+    print_color(f"Generating guest network configuration script: {output}", Colors.GREEN)
+    
+    script_content = f"""#!/bin/bash
+# Network configuration script for Firecracker MicroVM
+# Generated by firecracker_cli.py
+
+# Assign an IP address to the eth0 interface
+ip addr add {config.guest_ip}/{config.tap_netmask} dev eth0
+
+# Bring up the eth0 interface
+ip link set eth0 up
+
+# Add a default route via the gateway (host's tap IP)
+ip route add default via {config.tap_ip}
+
+# Configure DNS servers
+cat > /etc/resolv.conf <<EOF
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+EOF
+
+echo "Network configuration complete."
+"""
+    
+    with open(output, 'w') as f:
+        f.write(script_content)
+    
+    # Make the script executable
+    os.chmod(output, 0o755)
+    
+    print_color(f"Guest network configuration script generated: {output}", Colors.GREEN)
+    print_color(f"Copy this script to your VM and run it to configure networking.", Colors.YELLOW)
+
+
+@cli.command('show-config')
+def cmd_show_config():
+    """Show the current configuration."""
+    print_color("Current Configuration:", Colors.GREEN)
+    print_color(f"Socket Path: {config.socket_path}", Colors.BLUE)
+    print_color(f"TAP Device: {config.tap_device}", Colors.BLUE)
+    print_color(f"TAP IP: {config.tap_ip}/{config.tap_netmask}", Colors.BLUE)
+    print_color(f"Guest IP: {config.guest_ip}", Colors.BLUE)
+    print_color(f"Verbose Mode: {'Enabled' if config.verbose else 'Disabled'}", Colors.BLUE)
+    print_color(f"Dry Run Mode: {'Enabled' if config.dry_run else 'Disabled'}", Colors.BLUE)
 
 
 if __name__ == "__main__":

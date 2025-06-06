@@ -1,2 +1,2 @@
-# Basic requirements for firecracker_cli.py
-# No external dependencies needed - all modules are part of the Python standard library
+# Requirements for firecracker_cli.py
+click>=8.0.0

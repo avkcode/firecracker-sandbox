@@ -71,34 +71,47 @@ python3 firecracker_cli.py --help
 ```
 Displays available commands and their descriptions.
 
-### Command-line Options
+### Command-line Commands
 
-| Option          | Description                                                  |
-|-----------------|--------------------------------------------------------------|
-| `--activate`    | Create and activate the Firecracker API socket               |
-| `--deactivate`  | Deactivate and clean up the Firecracker API socket           |
-| `--net-up`      | Set up networking for Firecracker MicroVM                    |
-| `--net-down`    | Clean up networking resources                                |
-| `--start`       | Start the Firecracker MicroVM                                |
-| `--stop`        | Stop all Firecracker instances and clean up resources        |
-| `--login`       | Attempt to log into the running MicroVM via serial console   |
-| `--config-file` | Path to the VM configuration file (default: vm-config.json)  |
+| Command      | Description                                                  |
+|--------------|--------------------------------------------------------------|
+| `activate`   | Create and activate the Firecracker API socket               |
+| `deactivate` | Deactivate and clean up the Firecracker API socket           |
+| `net-up`     | Set up networking for Firecracker MicroVM                    |
+| `net-down`   | Clean up networking resources                                |
+| `start`      | Start the Firecracker MicroVM                                |
+| `stop`       | Stop all Firecracker instances and clean up resources        |
+| `login`      | Attempt to log into the running MicroVM via serial console   |
+| `setup`      | Set up everything and start the MicroVM (net-up + activate + start) |
+| `teardown`   | Stop the MicroVM and clean up all resources (stop + net-down + deactivate) |
+
+#### Options for `start` command
+| Option          | Description                                                 |
+|-----------------|-------------------------------------------------------------|
+| `--config-file` | Path to the VM configuration file (default: vm-config.json) |
 
 ## Example Workflows
 
 ### Complete Setup and Start
 ```bash
-sudo python3 firecracker_cli.py --net-up --activate --start
+sudo python3 firecracker_cli.py setup
 ```
 
 ### Stop and Clean Up Everything
 ```bash
-sudo python3 firecracker_cli.py --stop --net-down --deactivate
+sudo python3 firecracker_cli.py teardown
 ```
 
-### Start with Custom Configuration
+### Individual Commands
 ```bash
-sudo python3 firecracker_cli.py --start --config-file my-custom-config.json
+# Set up networking
+sudo python3 firecracker_cli.py net-up
+
+# Activate the socket
+sudo python3 firecracker_cli.py activate
+
+# Start with custom configuration
+sudo python3 firecracker_cli.py start --config-file my-custom-config.json
 ```
 
 ## Ensuring Network Functionality in the VM

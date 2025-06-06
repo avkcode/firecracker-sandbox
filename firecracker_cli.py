@@ -6,7 +6,6 @@ This tool provides a simple interface for setting up, starting, and stopping
 Firecracker MicroVMs, including networking configuration and API socket management.
 """
 
-import argparse
 import json
 import os
 import signal
@@ -14,6 +13,8 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
+import click
 
 
 class Colors:
@@ -268,67 +269,94 @@ def login_to_microvm():
     print_color("Login attempt complete.", Colors.GREEN)
 
 
-def main():
-    """Main entry point for the script."""
-    parser = argparse.ArgumentParser(
-        description="Firecracker CLI - A tool for managing Firecracker MicroVMs",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Set up networking and start a MicroVM
-  sudo python3 firecracker_cli.py --net-up --activate --start
-  
-  # Stop a running MicroVM and clean up
-  sudo python3 firecracker_cli.py --stop --net-down --deactivate
-  
-  # Start a MicroVM with a custom config file
-  sudo python3 firecracker_cli.py --start --config-file my-config.json
-        """
-    )
+@click.group(invoke_without_command=True, context_settings=dict(help_option_names=['-h', '--help']))
+@click.pass_context
+def cli(ctx):
+    """Firecracker CLI - A tool for managing Firecracker MicroVMs.
     
-    parser.add_argument("--activate", action="store_true", help="Create and activate the Firecracker API socket")
-    parser.add_argument("--deactivate", action="store_true", help="Deactivate and clean up the Firecracker API socket")
-    parser.add_argument("--net-up", action="store_true", help="Set up networking for Firecracker MicroVM")
-    parser.add_argument("--net-down", action="store_true", help="Clean up networking resources")
-    parser.add_argument("--start", action="store_true", help="Start the Firecracker MicroVM")
-    parser.add_argument("--stop", action="store_true", help="Stop all Firecracker instances and clean up resources")
-    parser.add_argument("--login", action="store_true", help="Attempt to log into the running MicroVM")
-    parser.add_argument("--config-file", type=str, default="vm-config.json", help="Path to the VM configuration file")
+    This tool provides a simple interface for setting up, starting, and stopping
+    Firecracker MicroVMs, including networking configuration and API socket management.
     
-    args = parser.parse_args()
+    Examples:
     
-    # If no arguments provided, show help
-    if len(sys.argv) == 1:
-        parser.print_help()
-        sys.exit(0)
-    
-    # Execute requested actions in a logical order
-    if args.stop:
-        stop_microvm()
-    
-    if args.net_down:
-        cleanup_networking()
-    
-    if args.deactivate:
-        deactivate_socket()
-    
-    if args.activate:
+      # Set up networking and start a MicroVM
+      sudo firecracker_cli.py net-up activate start
+      
+      # Stop a running MicroVM and clean up
+      sudo firecracker_cli.py stop net-down deactivate
+      
+      # Start a MicroVM with a custom config file
+      sudo firecracker_cli.py start --config-file my-config.json
+    """
+    # If no command is provided, show help
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
+
+
+@cli.command('activate')
+def cmd_activate():
+    """Create and activate the Firecracker API socket."""
+    activate_socket()
+
+
+@cli.command('deactivate')
+def cmd_deactivate():
+    """Deactivate and clean up the Firecracker API socket."""
+    deactivate_socket()
+
+
+@cli.command('net-up')
+def cmd_net_up():
+    """Set up networking for Firecracker MicroVM."""
+    setup_networking()
+
+
+@cli.command('net-down')
+def cmd_net_down():
+    """Clean up networking resources."""
+    cleanup_networking()
+
+
+@cli.command('start')
+@click.option('--config-file', default="vm-config.json", help="Path to the VM configuration file")
+def cmd_start(config_file):
+    """Start the Firecracker MicroVM."""
+    # Make sure socket is activated before starting
+    if not os.path.exists("/tmp/firecracker.socket"):
+        print_color("Firecracker API socket not found. Activating...", Colors.YELLOW)
         activate_socket()
     
-    if args.net_up:
-        setup_networking()
-    
-    if args.start:
-        # Make sure socket is activated before starting
-        if not os.path.exists("/tmp/firecracker.socket"):
-            print_color("Firecracker API socket not found. Activating...", Colors.YELLOW)
-            activate_socket()
-        
-        start_microvm(args.config_file)
-    
-    if args.login:
-        login_to_microvm()
+    start_microvm(config_file)
+
+
+@cli.command('stop')
+def cmd_stop():
+    """Stop all Firecracker instances and clean up resources."""
+    stop_microvm()
+
+
+@cli.command('login')
+def cmd_login():
+    """Attempt to log into the running MicroVM via serial console."""
+    login_to_microvm()
+
+
+@cli.command('setup')
+@click.option('--config-file', default="vm-config.json", help="Path to the VM configuration file")
+def cmd_setup(config_file):
+    """Set up everything and start the MicroVM (net-up + activate + start)."""
+    setup_networking()
+    activate_socket()
+    start_microvm(config_file)
+
+
+@cli.command('teardown')
+def cmd_teardown():
+    """Stop the MicroVM and clean up all resources (stop + net-down + deactivate)."""
+    stop_microvm()
+    cleanup_networking()
+    deactivate_socket()
 
 
 if __name__ == "__main__":
-    main()
+    cli()

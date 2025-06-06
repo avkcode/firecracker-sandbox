@@ -1,6 +1,6 @@
 # Firecracker MicroVM Setup
 
-This project provides a set of `Makefile` targets to simplify the setup, management, and cleanup of Firecracker MicroVMs. It includes networking configuration, API socket management, and VM lifecycle commands.
+This project provides a Python CLI tool to simplify the setup, management, and cleanup of Firecracker MicroVMs. It includes networking configuration, API socket management, and VM lifecycle commands.
 
 ## Features
 
@@ -8,16 +8,19 @@ This project provides a set of `Makefile` targets to simplify the setup, managem
 - **API Socket Management**: Creates and cleans up the Firecracker API socket.
 - **MicroVM Lifecycle**: Start and stop Firecracker instances with ease.
 - **Cleanup**: Automatically removes all resources (networking, sockets, etc.) when done.
+- **Command-line Interface**: Simple and intuitive CLI similar to firectl.
 
 ## Prerequisites
 
 - **Firecracker**: Install Firecracker from [https://github.com/firecracker-microvm/firecracker](https://github.com/firecracker-microvm/firecracker).
+- **Python 3.6+**: The CLI tool is written in Python.
 - **Dependencies**:
   - `iptables`
   - `iproute2`
   - `mkfifo`
+  - `screen` (for serial console access)
   - `sudo` privileges
-- **Configuration File**: Ensure you have a valid `config.json` file for Firecracker.
+- **Configuration File**: Ensure you have a valid `vm-config.json` file for Firecracker.
 
 ## Usage
 
@@ -28,71 +31,81 @@ bash tools/create-debian-rootfs.sh
 It should produce `firecracker-rootfs.ext4` and `vmlinux` files.
 `vm-config.json` is used for VM boot options.
 
-If you want to compile custom Kernel use tools\download-and-build-kernel.sh script.
+If you want to compile custom Kernel use tools/download-and-build-kernel.sh script.
 
-### 1. Set Up Networking
+### Basic Commands
+
+#### 1. Set Up Networking
 ```bash
-make net-up
+sudo python3 firecracker_cli.py --net-up
 ```
 This creates a `tap0` device, assigns an IP address, enables IP forwarding, and sets up NAT.
 
-### 2. Activate the Firecracker API Socket
+#### 2. Activate the Firecracker API Socket
 ```bash
-make activate
+sudo python3 firecracker_cli.py --activate
 ```
 This creates the Firecracker API socket at `/tmp/firecracker.socket`.
 
-### 3. Start the MicroVM
+#### 3. Start the MicroVM
 ```bash
-make up
+sudo python3 firecracker_cli.py --start
 ```
-Starts the Firecracker MicroVM using the configuration in `config.json`.
+Starts the Firecracker MicroVM using the configuration in `vm-config.json`.
 
-### 4. Stop the MicroVM and Clean Up
+#### 4. Stop the MicroVM and Clean Up
 ```bash
-make down
+sudo python3 firecracker_cli.py --stop
 ```
-Stops all Firecracker instances, cleans up networking resources, and deactivates the API socket.
+Stops all Firecracker instances and cleans up socket files.
 
-### 5. View Help
+#### 5. Clean Up Networking
 ```bash
-make help
+sudo python3 firecracker_cli.py --net-down
 ```
-Displays available `Makefile` targets and their descriptions.
+Removes the tap0 device and clears Firecracker-specific iptables rules.
 
-## Makefile Targets
-
-| Target       | Description                                                                 |
-|--------------|-----------------------------------------------------------------------------|
-| `activate`   | Create and activate the Firecracker API socket at `/tmp/firecracker.socket`. |
-| `deactivate` | Deactivate and clean up the Firecracker API socket.                         |
-| `net-up`     | Set up networking for Firecracker MicroVM (tap0 device, NAT, IP forwarding). |
-| `net-down`   | Clean up networking resources (remove tap0 device, clear iptables rules).    |
-| `up`         | Start the Firecracker MicroVM.                                             |
-| `down`       | Stop all Firecracker instances and clean up resources.                      |
-| `help`       | Show this help message.                                                    |
-
-## Example Workflow
-
+#### 6. View Help
 ```bash
-# Step 1: Set up networking
-make net-up
+python3 firecracker_cli.py --help
+```
+Displays available commands and their descriptions.
 
-# Step 2: Activate the API socket
-make activate
+### Command-line Options
 
-# Step 3: Start the MicroVM
-make up
+| Option          | Description                                                  |
+|-----------------|--------------------------------------------------------------|
+| `--activate`    | Create and activate the Firecracker API socket               |
+| `--deactivate`  | Deactivate and clean up the Firecracker API socket           |
+| `--net-up`      | Set up networking for Firecracker MicroVM                    |
+| `--net-down`    | Clean up networking resources                                |
+| `--start`       | Start the Firecracker MicroVM                                |
+| `--stop`        | Stop all Firecracker instances and clean up resources        |
+| `--login`       | Attempt to log into the running MicroVM via serial console   |
+| `--config-file` | Path to the VM configuration file (default: vm-config.json)  |
 
-# Step 4: Stop the MicroVM and clean up
-make down
+## Example Workflows
+
+### Complete Setup and Start
+```bash
+sudo python3 firecracker_cli.py --net-up --activate --start
+```
+
+### Stop and Clean Up Everything
+```bash
+sudo python3 firecracker_cli.py --stop --net-down --deactivate
+```
+
+### Start with Custom Configuration
+```bash
+sudo python3 firecracker_cli.py --start --config-file my-custom-config.json
 ```
 
 ## Ensuring Network Functionality in the VM
 After starting the Firecracker MicroVM, you need to configure networking inside the VM to ensure it has internet access and proper DNS resolution. Follow these steps:
 
-1. Configure Networking Inside the VM
-Once the VM starts, log in via SSH or the serial console and run the following commands:
+### Configure Networking Inside the VM
+Once the VM starts, log in via the serial console (using `--login` option) and run the following commands:
 ```
 # Assign an IP address to the eth0 interface
 ip addr add 192.168.1.2/24 dev eth0
@@ -112,9 +125,10 @@ EOF
 
 ## Notes
 
-- Ensure that `config.json` is properly configured for your Firecracker MicroVM.
-- The `net-up` and `net-down` targets modify system-wide networking settings. Use them with caution.
-- You may need `sudo` privileges for certain commands (e.g., `iptables`, `ip`).
+- Ensure that `vm-config.json` is properly configured for your Firecracker MicroVM.
+- The `--net-up` and `--net-down` options modify system-wide networking settings. Use them with caution.
+- You need `sudo` privileges for most operations (networking, socket creation, etc.).
+- The tool automatically handles dependencies between operations (e.g., activating the socket before starting the VM).
 
 ## License
 

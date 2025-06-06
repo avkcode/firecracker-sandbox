@@ -1,0 +1,2 @@
+# Basic requirements for firecracker_cli.py
+# No external dependencies needed - all modules are part of the Python standard library

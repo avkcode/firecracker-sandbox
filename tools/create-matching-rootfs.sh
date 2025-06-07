@@ -183,8 +183,14 @@ EOF
     mkdir -p "$ROOTFS_DIR/etc/default"
     echo 'LANG="C.UTF-8"' > "$ROOTFS_DIR/etc/default/locale"
     
-    # Install essential packages including systemd
-    chroot "$ROOTFS_DIR" /bin/bash -c "apt update && apt install -y --no-install-recommends iproute2 iputils-ping net-tools curl wget vim systemd"
+    # Install essential packages including systemd and init
+    chroot "$ROOTFS_DIR" /bin/bash -c "apt update && apt install -y --no-install-recommends iproute2 iputils-ping net-tools curl wget vim systemd-sysv init"
+    
+    # Verify init exists
+    if [ ! -f "$ROOTFS_DIR/sbin/init" ]; then
+        echo "WARNING: /sbin/init not found, creating symlink to systemd"
+        chroot "$ROOTFS_DIR" /bin/bash -c "ln -sf /lib/systemd/systemd /sbin/init"
+    fi
     
     # Clean up apt cache to reduce image size
     chroot "$ROOTFS_DIR" /bin/bash -c "apt clean && rm -rf /var/lib/apt/lists/*"

@@ -146,6 +146,14 @@ create_rootfs() {
 ff02::1         ip6-allnodes
 ff02::2         ip6-allrouters
 EOF
+
+    # Configure serial console
+    mkdir -p "$ROOTFS_DIR/etc/systemd/system/serial-getty@ttyS0.service.d"
+    cat > "$ROOTFS_DIR/etc/systemd/system/serial-getty@ttyS0.service.d/override.conf" << EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --noclear %I 115200 linux
+EOF
     
     # Create network directory and configure network interfaces
     mkdir -p "$ROOTFS_DIR/etc/network"
@@ -184,7 +192,7 @@ EOF
     echo 'LANG="C.UTF-8"' > "$ROOTFS_DIR/etc/default/locale"
     
     # Install essential packages including systemd and init
-    chroot "$ROOTFS_DIR" /bin/bash -c "apt update && apt install -y --no-install-recommends iproute2 iputils-ping net-tools curl wget vim systemd-sysv init"
+    chroot "$ROOTFS_DIR" /bin/bash -c "apt update && apt install -y --no-install-recommends iproute2 iputils-ping net-tools curl wget vim systemd-sysv init systemd-container"
     
     # Verify init exists
     if [ ! -f "$ROOTFS_DIR/sbin/init" ]; then
@@ -217,6 +225,37 @@ EOF
     # Create symlink for service instead of using systemctl in chroot
     mkdir -p "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants"
     ln -sf "/etc/systemd/system/rc-local.service" "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/rc-local.service"
+    
+    # Enable serial-getty service
+    mkdir -p "$ROOTFS_DIR/etc/systemd/system/getty.target.wants"
+    ln -sf "/lib/systemd/system/serial-getty@.service" "$ROOTFS_DIR/etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service"
+    
+    # Create a custom systemd service for ttyS0
+    cat > "$ROOTFS_DIR/etc/systemd/system/getty@ttyS0.service" << EOF
+[Unit]
+Description=Serial Console Service for ttyS0
+BindsTo=dev-ttyS0.device
+After=dev-ttyS0.device systemd-user-sessions.service plymouth-quit-wait.service getty-pre.target
+After=rc-local.service
+Before=getty.target
+IgnoreOnIsolate=yes
+
+[Service]
+Type=idle
+Restart=always
+RestartSec=0
+ExecStart=/sbin/agetty --autologin root -L ttyS0 115200 linux
+UtmpIdentifier=ttyS0
+TTYPath=/dev/ttyS0
+TTYReset=yes
+TTYVHangup=yes
+
+[Install]
+WantedBy=getty.target
+EOF
+
+    # Enable the custom service
+    ln -sf "/etc/systemd/system/getty@ttyS0.service" "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/getty@ttyS0.service"
     
     echo "Rootfs creation complete!"
 }

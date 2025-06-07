@@ -3,6 +3,12 @@
     "kernel_image_path": "./vmlinux",
     "boot_args": "console=ttyS0 reboot=k panic=1 pci=off root=/dev/vda rw rootfstype=ext4 virtio_mmio.device=4K@0xd0000000:5 virtio_mmio.device=4K@0xd0001000:6 virtio_mmio.device=4K@0xd0002000:7 init=/lib/systemd/systemd"
   },
+  "logger": {
+    "log_path": "./firecracker.log",
+    "level": "Debug",
+    "show_level": true,
+    "show_log_origin": true
+  },
   "drives": [
     {
       "drive_id": "rootfs",

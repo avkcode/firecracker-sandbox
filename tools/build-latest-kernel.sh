@@ -144,6 +144,18 @@ build_kernel() {
     ./scripts/config --set-val CONFIG_SERIAL_8250 y
     ./scripts/config --set-val CONFIG_SERIAL_8250_CONSOLE y
     
+    # Additional required drivers for Firecracker
+    ./scripts/config --set-val CONFIG_VIRTIO y
+    ./scripts/config --set-val CONFIG_VIRTIO_RING y
+    ./scripts/config --set-val CONFIG_VIRTIO_CONSOLE y
+    ./scripts/config --set-val CONFIG_SCSI_VIRTIO y
+    
+    # Root filesystem support
+    ./scripts/config --set-val CONFIG_DEVTMPFS y
+    ./scripts/config --set-val CONFIG_DEVTMPFS_MOUNT y
+    ./scripts/config --set-val CONFIG_BLOCK y
+    ./scripts/config --set-val CONFIG_BLK_DEV y
+    
     # Disable modules to reduce kernel size
     ./scripts/config --set-val CONFIG_MODULES n
     

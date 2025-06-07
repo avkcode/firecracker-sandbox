@@ -22,7 +22,7 @@ check_root() {
 install_dependencies() {
     echo "Installing required packages..."
     apt update
-    apt install -y debootstrap e2fsprogs
+    apt install -y debootstrap e2fsprogs debian-archive-keyring
 }
 
 # Function to create the rootfs

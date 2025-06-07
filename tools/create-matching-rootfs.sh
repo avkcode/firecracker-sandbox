@@ -231,37 +231,53 @@ EOF
     mkdir -p "$ROOTFS_DIR/etc/systemd/system/getty.target.wants"
     ln -sf "/lib/systemd/system/serial-getty@.service" "$ROOTFS_DIR/etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service"
     
-    # Make sure systemd doesn't wait too long for devices
+    # Make systemd not wait for devices at all
     mkdir -p "$ROOTFS_DIR/etc/systemd/system.conf.d"
     cat > "$ROOTFS_DIR/etc/systemd/system.conf.d/10-timeout.conf" << EOF
 [Manager]
-DefaultTimeoutStartSec=5s
-DefaultDeviceTimeoutSec=5s
+DefaultTimeoutStartSec=2s
+DefaultDeviceTimeoutSec=1s
 EOF
 
-    # Create udev rules for ttyS0
+    # Create udev rules for console devices
     mkdir -p "$ROOTFS_DIR/etc/udev/rules.d"
-    cat > "$ROOTFS_DIR/etc/udev/rules.d/90-ttyS0.rules" << EOF
+    cat > "$ROOTFS_DIR/etc/udev/rules.d/90-console.rules" << EOF
+KERNEL=="console", MODE="0666"
 KERNEL=="ttyS0", SYMLINK+="console", MODE="0666"
 EOF
+
+    # Create a symlink for console
+    mkdir -p "$ROOTFS_DIR/dev"
+    ln -sf ttyS0 "$ROOTFS_DIR/dev/console"
     
-    # Configure serial console properly for Firecracker
-    mkdir -p "$ROOTFS_DIR/etc/systemd/system/serial-getty@ttyS0.service.d"
-    cat > "$ROOTFS_DIR/etc/systemd/system/serial-getty@ttyS0.service.d/override.conf" << EOF
+    # Create a custom getty service for console instead of using serial-getty
+    cat > "$ROOTFS_DIR/etc/systemd/system/console-getty.service" << EOF
 [Unit]
-BindsTo=dev-ttyS0.device
-After=dev-ttyS0.device
-Wants=dev-ttyS0.device
+Description=Console Getty
+After=systemd-user-sessions.service plymouth-quit-wait.service
+ConditionPathExists=/dev/console
 
 [Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin root --noclear --keep-baud 115200,38400,9600 ttyS0 linux
+ExecStart=/sbin/agetty --autologin root --noclear --keep-baud console 115200,38400,9600 linux
 Type=idle
 Restart=always
 RestartSec=0
 TTYReset=no
 TTYVHangup=no
+IgnoreSIGPIPE=no
+SendSIGHUP=yes
+
+[Install]
+WantedBy=multi-user.target
 EOF
+
+    # Enable the custom console service
+    mkdir -p "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants"
+    ln -sf "/etc/systemd/system/console-getty.service" "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/console-getty.service"
+
+    # Disable the problematic serial-getty service
+    mkdir -p "$ROOTFS_DIR/etc/systemd/system"
+    ln -sf "/dev/null" "$ROOTFS_DIR/etc/systemd/system/serial-getty@ttyS0.service"
     
     echo "Rootfs creation complete!"
 }

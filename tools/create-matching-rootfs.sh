@@ -191,8 +191,17 @@ EOF
     mkdir -p "$ROOTFS_DIR/etc/default"
     echo 'LANG="C.UTF-8"' > "$ROOTFS_DIR/etc/default/locale"
     
+    # Generate and configure locales
+    chroot "$ROOTFS_DIR" /bin/bash -c "apt update && apt install -y locales"
+    echo "en_US.UTF-8 UTF-8" > "$ROOTFS_DIR/etc/locale.gen"
+    chroot "$ROOTFS_DIR" /bin/bash -c "locale-gen"
+    cat > "$ROOTFS_DIR/etc/environment" << EOF
+LANG=C.UTF-8
+LC_ALL=C.UTF-8
+EOF
+    
     # Install essential packages including systemd and init
-    chroot "$ROOTFS_DIR" /bin/bash -c "apt update && apt install -y --no-install-recommends iproute2 iputils-ping net-tools curl wget vim systemd-sysv init systemd-container"
+    chroot "$ROOTFS_DIR" /bin/bash -c "apt update && DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends iproute2 iputils-ping net-tools curl wget vim systemd-sysv init systemd-container apt-utils"
     
     # Verify init exists
     if [ ! -f "$ROOTFS_DIR/sbin/init" ]; then
@@ -246,6 +255,27 @@ KERNEL=="console", MODE="0666"
 KERNEL=="ttyS0", SYMLINK+="console", MODE="0666"
 EOF
 
+    # Ensure /dev/pts is properly mounted
+    mkdir -p "$ROOTFS_DIR/etc/systemd/system/dev-pts.mount.d"
+    cat > "$ROOTFS_DIR/etc/systemd/system/dev-pts.mount.d/override.conf" << EOF
+[Unit]
+Description=Devpts file system
+DefaultDependencies=no
+Conflicts=umount.target
+Before=local-fs.target umount.target
+After=swap.target
+
+[Mount]
+What=devpts
+Where=/dev/pts
+Type=devpts
+Options=mode=620,gid=5,nosuid,noexec,ptmxmode=000
+DirectoryMode=755
+
+[Install]
+WantedBy=local-fs.target
+EOF
+
     # Create a symlink for console
     mkdir -p "$ROOTFS_DIR/dev"
     ln -sf ttyS0 "$ROOTFS_DIR/dev/console"
@@ -266,6 +296,8 @@ TTYReset=no
 TTYVHangup=no
 IgnoreSIGPIPE=no
 SendSIGHUP=yes
+Environment="LANG=C.UTF-8"
+Environment="LC_ALL=C.UTF-8"
 
 [Install]
 WantedBy=multi-user.target

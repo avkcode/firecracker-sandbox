@@ -15,7 +15,18 @@ THREADS=$(nproc)
 # Function to get the latest stable kernel version
 get_latest_kernel_version() {
     echo "Fetching the latest stable kernel version..."
-    LATEST_VERSION=$(curl -s https://www.kernel.org/ | grep -A 1 "latest_link" | grep -o 'Linux [0-9.]*' | grep -o '[0-9.]*')
+    LATEST_VERSION=$(curl -s https://www.kernel.org/ | grep -A 1 "latest_stable" | grep -o 'Linux [0-9.]*' | grep -o '[0-9.]*')
+    
+    if [ -z "$LATEST_VERSION" ]; then
+        echo "Failed to fetch latest version from kernel.org. Using fallback method..."
+        LATEST_VERSION=$(curl -s https://www.kernel.org/releases.json | grep -o '"latest_stable": *"[0-9.]*"' | grep -o '[0-9.]*')
+    fi
+    
+    if [ -z "$LATEST_VERSION" ]; then
+        echo "All methods failed. Using hardcoded fallback version 6.11.0"
+        LATEST_VERSION="6.11.0"
+    fi
+    
     echo "Latest stable kernel version: $LATEST_VERSION"
     return 0
 }
@@ -26,7 +37,13 @@ download_kernel_source() {
     local major_version=$(echo $version | cut -d. -f1)
     
     echo "Downloading Linux kernel $version..."
-    wget -q --show-progress "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$version.tar.xz" -O "$TEMP_DIR/linux-$version.tar.xz"
+    wget -q --show-progress --timeout=60 "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$version.tar.xz" -O "$TEMP_DIR/linux-$version.tar.xz"
+    
+    # Check if download was successful
+    if [ $? -ne 0 ]; then
+        echo "Download failed. Trying alternative mirror..."
+        wget -q --show-progress --timeout=60 "https://mirrors.edge.kernel.org/pub/linux/kernel/v$major_version.x/linux-$version.tar.xz" -O "$TEMP_DIR/linux-$version.tar.xz"
+    fi
     
     echo "Extracting kernel source..."
     tar -xf "$TEMP_DIR/linux-$version.tar.xz" -C "$BUILD_DIR"
@@ -102,17 +119,23 @@ build_kernel() {
 echo "===== Linux Kernel Build Script for Firecracker ====="
 
 # Install dependencies
-install_dependencies
+install_dependencies || { echo "Failed to install dependencies. Continuing anyway..."; }
 
 # Get the latest kernel version
 get_latest_kernel_version
 KERNEL_VERSION=$LATEST_VERSION
 
+# Check if kernel version was obtained
+if [ -z "$KERNEL_VERSION" ]; then
+    echo "Error: Failed to determine kernel version. Exiting."
+    exit 1
+fi
+
 # Download the kernel source
-download_kernel_source $KERNEL_VERSION
+download_kernel_source $KERNEL_VERSION || { echo "Error: Failed to download kernel source. Exiting."; exit 1; }
 
 # Build the kernel
-build_kernel
+build_kernel || { echo "Error: Failed to build kernel. Exiting."; exit 1; }
 
 # Clean up
 echo "Cleaning up temporary files..."

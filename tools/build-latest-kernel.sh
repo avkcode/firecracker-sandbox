@@ -174,6 +174,15 @@ build_kernel() {
     ./scripts/config --set-val CONFIG_EXT4_FS_SECURITY y
     ./scripts/config --set-val CONFIG_FS_POSIX_ACL y
     
+    # Critical drivers for block device detection
+    ./scripts/config --set-val CONFIG_BLK_DEV_LOOP y
+    ./scripts/config --set-val CONFIG_BLK_DEV_RAM y
+    ./scripts/config --set-val CONFIG_VIRTIO_BLK y
+    
+    # Disable RAID to avoid autodetection
+    ./scripts/config --set-val CONFIG_MD n
+    ./scripts/config --set-val CONFIG_MD_AUTODETECT n
+    
     # Answer yes to all prompts during build
     echo "Ensuring all prompts are answered with 'y'..."
     sed -i 's/.*CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES.*/CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES=y/' .config

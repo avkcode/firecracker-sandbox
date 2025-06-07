@@ -84,7 +84,7 @@ create_ext4_image() {
     dd if=/dev/zero of="$ROOTFS_IMAGE" bs=1M count="$IMAGE_SIZE" status=progress
     
     echo "Formatting image as ext4..."
-    mkfs.ext4 "$ROOTFS_IMAGE"
+    mkfs.ext4 -F -L "rootfs" "$ROOTFS_IMAGE"
     
     echo "Mounting image..."
     mkdir -p /mnt/rootfs
@@ -92,6 +92,17 @@ create_ext4_image() {
     
     echo "Copying rootfs to image..."
     cp -a "$ROOTFS_DIR"/* /mnt/rootfs/
+    
+    # Create device nodes
+    echo "Creating essential device nodes..."
+    mkdir -p /mnt/rootfs/dev
+    mknod -m 622 /mnt/rootfs/dev/console c 5 1
+    mknod -m 666 /mnt/rootfs/dev/null c 1 3
+    mknod -m 666 /mnt/rootfs/dev/zero c 1 5
+    mknod -m 666 /mnt/rootfs/dev/ptmx c 5 2
+    mknod -m 666 /mnt/rootfs/dev/tty c 5 0
+    mknod -m 444 /mnt/rootfs/dev/random c 1 8
+    mknod -m 444 /mnt/rootfs/dev/urandom c 1 9
     
     echo "Unmounting image..."
     umount /mnt/rootfs

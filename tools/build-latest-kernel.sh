@@ -15,13 +15,28 @@ THREADS=$(nproc)
 # Function to get the latest stable kernel version
 get_latest_kernel_version() {
     echo "Fetching the latest stable kernel version..."
-    LATEST_VERSION=$(curl -s https://www.kernel.org/ | grep -A 1 "latest_stable" | grep -o 'Linux [0-9.]*' | grep -o '[0-9.]*')
     
+    # Method 1: Direct parsing of kernel.org HTML
+    LATEST_VERSION=$(curl -s --max-time 10 https://www.kernel.org/ | grep -A 1 "latest_stable" | grep -o 'Linux [0-9.]*' | grep -o '[0-9.]*')
+    
+    # Debug output
+    echo "Method 1 result: '$LATEST_VERSION'"
+    
+    # Method 2: Using releases.json API
     if [ -z "$LATEST_VERSION" ]; then
-        echo "Failed to fetch latest version from kernel.org. Using fallback method..."
-        LATEST_VERSION=$(curl -s https://www.kernel.org/releases.json | grep -o '"latest_stable": *"[0-9.]*"' | grep -o '[0-9.]*')
+        echo "Method 1 failed. Trying releases.json API..."
+        LATEST_VERSION=$(curl -s --max-time 10 https://www.kernel.org/releases.json | grep -o '"latest_stable": *"[0-9.]*"' | grep -o '[0-9.]*')
+        echo "Method 2 result: '$LATEST_VERSION'"
     fi
     
+    # Method 3: Using a different parsing approach
+    if [ -z "$LATEST_VERSION" ]; then
+        echo "Method 2 failed. Trying alternative parsing..."
+        LATEST_VERSION=$(curl -s --max-time 10 https://www.kernel.org/ | grep -o 'Latest stable kernel version is [0-9.]*' | grep -o '[0-9.]*')
+        echo "Method 3 result: '$LATEST_VERSION'"
+    fi
+    
+    # Fallback to hardcoded version
     if [ -z "$LATEST_VERSION" ]; then
         echo "All methods failed. Using hardcoded fallback version 6.11.0"
         LATEST_VERSION="6.11.0"
@@ -35,24 +50,57 @@ get_latest_kernel_version() {
 download_kernel_source() {
     local version=$1
     local major_version=$(echo $version | cut -d. -f1)
+    local download_file="$TEMP_DIR/linux-$version.tar.xz"
     
     echo "Downloading Linux kernel $version..."
-    wget -q --show-progress --timeout=60 "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$version.tar.xz" -O "$TEMP_DIR/linux-$version.tar.xz"
+    
+    # Try primary mirror
+    echo "Trying primary mirror (cdn.kernel.org)..."
+    wget -q --show-progress --timeout=60 --tries=3 "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$version.tar.xz" -O "$download_file"
     
     # Check if download was successful
-    if [ $? -ne 0 ]; then
-        echo "Download failed. Trying alternative mirror..."
-        wget -q --show-progress --timeout=60 "https://mirrors.edge.kernel.org/pub/linux/kernel/v$major_version.x/linux-$version.tar.xz" -O "$TEMP_DIR/linux-$version.tar.xz"
+    if [ $? -ne 0 ] || [ ! -s "$download_file" ]; then
+        echo "Primary mirror download failed. Trying alternative mirror..."
+        wget -q --show-progress --timeout=60 --tries=3 "https://mirrors.edge.kernel.org/pub/linux/kernel/v$major_version.x/linux-$version.tar.xz" -O "$download_file"
+        
+        # Check if second attempt was successful
+        if [ $? -ne 0 ] || [ ! -s "$download_file" ]; then
+            echo "Alternative mirror download failed. Trying third mirror..."
+            wget -q --show-progress --timeout=60 --tries=3 "https://www.kernel.org/pub/linux/kernel/v$major_version.x/linux-$version.tar.xz" -O "$download_file"
+            
+            # Check if third attempt was successful
+            if [ $? -ne 0 ] || [ ! -s "$download_file" ]; then
+                echo "ERROR: All download attempts failed. Please check your internet connection or try again later."
+                return 1
+            fi
+        fi
+    fi
+    
+    echo "Download completed successfully. Verifying archive..."
+    # Verify the archive is valid
+    if ! tar -tf "$download_file" &>/dev/null; then
+        echo "ERROR: Downloaded file is not a valid tar archive."
+        return 1
     fi
     
     echo "Extracting kernel source..."
-    tar -xf "$TEMP_DIR/linux-$version.tar.xz" -C "$BUILD_DIR"
+    tar -xf "$download_file" -C "$BUILD_DIR"
+    
+    # Verify extraction was successful
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to extract kernel source."
+        return 1
+    fi
     
     # Rename directory to linux-latest for consistency
     if [ -d "$BUILD_DIR/linux-$version" ] && [ ! -d "$BUILD_DIR/$KERNEL_DIR" ]; then
         mv "$BUILD_DIR/linux-$version" "$BUILD_DIR/$KERNEL_DIR"
+    elif [ ! -d "$BUILD_DIR/linux-$version" ]; then
+        echo "ERROR: Expected directory linux-$version not found after extraction."
+        return 1
     fi
     
+    echo "Kernel source extracted successfully."
     return 0
 }
 
@@ -119,7 +167,7 @@ build_kernel() {
 echo "===== Linux Kernel Build Script for Firecracker ====="
 
 # Install dependencies
-install_dependencies || { echo "Failed to install dependencies. Continuing anyway..."; }
+install_dependencies || { echo "WARNING: Failed to install dependencies. Continuing anyway..."; }
 
 # Get the latest kernel version
 get_latest_kernel_version
@@ -127,15 +175,23 @@ KERNEL_VERSION=$LATEST_VERSION
 
 # Check if kernel version was obtained
 if [ -z "$KERNEL_VERSION" ]; then
-    echo "Error: Failed to determine kernel version. Exiting."
+    echo "ERROR: Failed to determine kernel version. Exiting."
     exit 1
 fi
 
+echo "Using kernel version: $KERNEL_VERSION"
+
 # Download the kernel source
-download_kernel_source $KERNEL_VERSION || { echo "Error: Failed to download kernel source. Exiting."; exit 1; }
+if ! download_kernel_source $KERNEL_VERSION; then
+    echo "ERROR: Failed to download and extract kernel source. Exiting."
+    exit 1
+fi
 
 # Build the kernel
-build_kernel || { echo "Error: Failed to build kernel. Exiting."; exit 1; }
+if ! build_kernel; then
+    echo "ERROR: Failed to build kernel. Exiting."
+    exit 1
+fi
 
 # Clean up
 echo "Cleaning up temporary files..."

@@ -179,8 +179,12 @@ EOF
     # Make rc.local executable
     chmod +x "$ROOTFS_DIR/etc/rc.local"
     
-    # Install essential packages
-    chroot "$ROOTFS_DIR" /bin/bash -c "apt update && apt install -y --no-install-recommends iproute2 iputils-ping net-tools curl wget vim"
+    # Configure locale to avoid warnings
+    mkdir -p "$ROOTFS_DIR/etc/default"
+    echo 'LANG="C.UTF-8"' > "$ROOTFS_DIR/etc/default/locale"
+    
+    # Install essential packages including systemd
+    chroot "$ROOTFS_DIR" /bin/bash -c "apt update && apt install -y --no-install-recommends iproute2 iputils-ping net-tools curl wget vim systemd"
     
     # Clean up apt cache to reduce image size
     chroot "$ROOTFS_DIR" /bin/bash -c "apt clean && rm -rf /var/lib/apt/lists/*"
@@ -204,8 +208,9 @@ SysVStartPriority=99
 WantedBy=multi-user.target
 EOF
     
-    # Enable the service
-    chroot "$ROOTFS_DIR" /bin/bash -c "systemctl enable rc-local.service"
+    # Create symlink for service instead of using systemctl in chroot
+    mkdir -p "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants"
+    ln -sf "/etc/systemd/system/rc-local.service" "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/rc-local.service"
     
     echo "Rootfs creation complete!"
 }

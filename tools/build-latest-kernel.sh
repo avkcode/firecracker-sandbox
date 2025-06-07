@@ -16,24 +16,24 @@ THREADS=$(nproc)
 get_latest_kernel_version() {
     echo "Fetching the latest stable kernel version..."
     
-    # Method 1: Direct parsing of kernel.org HTML
-    LATEST_VERSION=$(curl -s --max-time 10 https://www.kernel.org/ | grep -A 1 "latest_stable" | grep -o 'Linux [0-9.]*' | grep -o '[0-9.]*')
+    # Try using the releases.json API directly (most reliable)
+    LATEST_VERSION=$(curl -s --max-time 15 https://www.kernel.org/releases.json | grep -o '"version": *"[0-9.]*"' | head -1 | grep -o '[0-9.]*')
     
     # Debug output
-    echo "Method 1 result: '$LATEST_VERSION'"
+    echo "API method result: '$LATEST_VERSION'"
     
-    # Method 2: Using releases.json API
+    # Try using wget if curl failed
     if [ -z "$LATEST_VERSION" ]; then
-        echo "Method 1 failed. Trying releases.json API..."
-        LATEST_VERSION=$(curl -s --max-time 10 https://www.kernel.org/releases.json | grep -o '"latest_stable": *"[0-9.]*"' | grep -o '[0-9.]*')
-        echo "Method 2 result: '$LATEST_VERSION'"
+        echo "Curl method failed. Trying wget..."
+        LATEST_VERSION=$(wget -q -O - https://www.kernel.org/releases.json | grep -o '"version": *"[0-9.]*"' | head -1 | grep -o '[0-9.]*')
+        echo "Wget method result: '$LATEST_VERSION'"
     fi
     
-    # Method 3: Using a different parsing approach
+    # Try direct HTML parsing with different patterns
     if [ -z "$LATEST_VERSION" ]; then
-        echo "Method 2 failed. Trying alternative parsing..."
-        LATEST_VERSION=$(curl -s --max-time 10 https://www.kernel.org/ | grep -o 'Latest stable kernel version is [0-9.]*' | grep -o '[0-9.]*')
-        echo "Method 3 result: '$LATEST_VERSION'"
+        echo "JSON methods failed. Trying direct HTML parsing..."
+        LATEST_VERSION=$(curl -s --max-time 15 https://www.kernel.org/ | grep -o 'The latest stable version of the Linux kernel is [0-9.]*' | grep -o '[0-9.]*')
+        echo "HTML parsing result: '$LATEST_VERSION'"
     fi
     
     # Fallback to hardcoded version
@@ -163,6 +163,22 @@ build_kernel() {
     return 0
 }
 
+# Function to prompt for manual kernel version input
+prompt_for_kernel_version() {
+    echo "Would you like to specify a kernel version manually? (y/n)"
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        echo "Please enter the kernel version (e.g., 6.11.0):"
+        read -r manual_version
+        if [[ -n "$manual_version" ]]; then
+            echo "Using manually specified kernel version: $manual_version"
+            LATEST_VERSION="$manual_version"
+            return 0
+        fi
+    fi
+    return 1
+}
+
 # Main execution
 echo "===== Linux Kernel Build Script for Firecracker ====="
 
@@ -175,8 +191,14 @@ KERNEL_VERSION=$LATEST_VERSION
 
 # Check if kernel version was obtained
 if [ -z "$KERNEL_VERSION" ]; then
-    echo "ERROR: Failed to determine kernel version. Exiting."
-    exit 1
+    echo "ERROR: Failed to determine kernel version automatically."
+    # Prompt for manual input
+    if prompt_for_kernel_version; then
+        KERNEL_VERSION=$LATEST_VERSION
+    else
+        echo "No kernel version specified. Exiting."
+        exit 1
+    fi
 fi
 
 echo "Using kernel version: $KERNEL_VERSION"

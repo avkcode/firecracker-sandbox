@@ -18,6 +18,22 @@ check_root() {
     fi
 }
 
+# Function to check available disk space
+check_disk_space() {
+    local required_space=5000  # 5GB in MB
+    local available_space=$(df -m . | awk 'NR==2 {print $4}')
+    
+    echo "Available disk space: ${available_space}MB"
+    echo "Required disk space: ${required_space}MB"
+    
+    if [ "$available_space" -lt "$required_space" ]; then
+        echo "ERROR: Not enough disk space. Need at least ${required_space}MB, but only ${available_space}MB available."
+        exit 1
+    fi
+    
+    echo "Disk space check passed."
+}
+
 # Function to install dependencies
 install_dependencies() {
     echo "Installing required packages..."
@@ -35,8 +51,19 @@ create_rootfs() {
     mkdir -p "$ROOTFS_DIR"
     
     echo "Running debootstrap to create a minimal Debian system..."
-    debootstrap --variant=minbase --keyring=/usr/share/keyrings/debian-archive-keyring.gpg bullseye "$ROOTFS_DIR" http://deb.debian.org/debian
+    echo "This may take a while..."
     
+    # Run debootstrap with verbose output and error handling
+    if ! debootstrap --verbose --variant=minbase --keyring=/usr/share/keyrings/debian-archive-keyring.gpg bullseye "$ROOTFS_DIR" http://deb.debian.org/debian; then
+        echo "ERROR: debootstrap failed. Check the output above for details."
+        echo "Common issues include:"
+        echo "  - Insufficient disk space"
+        echo "  - Network connectivity problems"
+        echo "  - Corrupt package files"
+        exit 1
+    fi
+    
+    echo "Debootstrap completed successfully!"
     echo "Configuring the rootfs..."
     
     # Set root password to 'root'
@@ -147,6 +174,9 @@ echo "===== Debian Rootfs Creation Script for Firecracker ====="
 
 # Check if running as root
 check_root
+
+# Check available disk space
+check_disk_space
 
 # Install dependencies
 install_dependencies

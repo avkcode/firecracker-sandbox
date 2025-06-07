@@ -103,6 +103,11 @@ build-rootfs:
 	@echo "Creating a Debian rootfs that matches the latest kernel..."
 	@sudo bash tools/create-matching-rootfs.sh
 
+.PHONY: build-simple-rootfs
+build-simple-rootfs:
+	@echo "Creating a simple busybox rootfs for Firecracker..."
+	@sudo bash tools/create-simple-rootfs.sh
+
 .PHONY: build-all
-build-all: build-kernel build-rootfs
+build-all: build-kernel build-simple-rootfs
 	@echo "Build complete. Kernel and rootfs are ready for Firecracker."

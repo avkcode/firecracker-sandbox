@@ -22,7 +22,11 @@ check_root() {
 install_dependencies() {
     echo "Installing required packages..."
     apt update
-    apt install -y debootstrap e2fsprogs debian-archive-keyring
+    apt install -y debootstrap e2fsprogs debian-archive-keyring curl wget
+    
+    # Ensure we have the latest Debian keyring
+    mkdir -p /usr/share/keyrings
+    curl -fsSL https://ftp-master.debian.org/keys/archive-key-11.asc | gpg --dearmor -o /usr/share/keyrings/debian-archive-keyring.gpg
 }
 
 # Function to create the rootfs
@@ -31,7 +35,7 @@ create_rootfs() {
     mkdir -p "$ROOTFS_DIR"
     
     echo "Running debootstrap to create a minimal Debian system..."
-    debootstrap --variant=minbase bullseye "$ROOTFS_DIR" http://deb.debian.org/debian
+    debootstrap --variant=minbase --keyring=/usr/share/keyrings/debian-archive-keyring.gpg bullseye "$ROOTFS_DIR" http://deb.debian.org/debian
     
     echo "Configuring the rootfs..."
     

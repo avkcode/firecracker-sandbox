@@ -156,6 +156,28 @@ build_kernel() {
     ./scripts/config --set-val CONFIG_BLOCK y
     ./scripts/config --set-val CONFIG_BLK_DEV y
     
+    # Additional block device support
+    ./scripts/config --set-val CONFIG_ATA y
+    ./scripts/config --set-val CONFIG_ATA_PIIX y
+    ./scripts/config --set-val CONFIG_SATA_AHCI y
+    ./scripts/config --set-val CONFIG_ATA_SFF y
+    ./scripts/config --set-val CONFIG_ATA_BMDMA y
+    ./scripts/config --set-val CONFIG_ATA_GENERIC y
+    
+    # Ensure virtio block device support is enabled
+    ./scripts/config --set-val CONFIG_VIRTIO_BLK_SCSI y
+    ./scripts/config --set-val CONFIG_VIRTIO_PCI_MODERN y
+    ./scripts/config --set-val CONFIG_VIRTIO_PCI_LEGACY y
+    
+    # File systems
+    ./scripts/config --set-val CONFIG_EXT4_FS_POSIX_ACL y
+    ./scripts/config --set-val CONFIG_EXT4_FS_SECURITY y
+    ./scripts/config --set-val CONFIG_FS_POSIX_ACL y
+    
+    # Answer yes to all prompts during build
+    echo "Ensuring all prompts are answered with 'y'..."
+    sed -i 's/.*CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES.*/CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES=y/' .config
+    
     # Disable modules to reduce kernel size
     ./scripts/config --set-val CONFIG_MODULES n
     

@@ -177,9 +177,30 @@ ip route add default via 192.168.1.1
 
 # Configure DNS
 cat > /etc/resolv.conf << DNS_EOF
+nameserver 1.1.1.1
 nameserver 8.8.8.8
-nameserver 8.8.4.4
 DNS_EOF
+
+# Enable IP forwarding for better connectivity
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+# Wait for network to be ready
+sleep 2
+
+# Test network connectivity and retry if needed
+for i in \$(seq 1 5); do
+    if ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1; then
+        echo "Network is up and running!"
+        break
+    fi
+    echo "Retrying network setup (attempt \$i)..."
+    ip link set eth0 down
+    sleep 1
+    ip link set eth0 up
+    ip addr add 192.168.1.2/24 dev eth0
+    ip route add default via 192.168.1.1
+    sleep 2
+done
 
 exit 0
 EOF

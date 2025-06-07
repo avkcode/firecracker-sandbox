@@ -9,8 +9,17 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# Create a tap device
-ip tuntap add tap0 mode tap
+# Create a tap device (or use existing one)
+if ! ip link show tap0 >/dev/null 2>&1; then
+    echo "Creating new tap0 device..."
+    ip tuntap add tap0 mode tap
+else
+    echo "tap0 device already exists, reconfiguring..."
+    ip link set tap0 down
+fi
+
+# Configure the tap device
+ip addr flush dev tap0
 ip addr add 192.168.1.1/24 dev tap0
 ip link set tap0 up
 

@@ -197,8 +197,14 @@ for i in \$(seq 1 5); do
     ip link set eth0 down
     sleep 1
     ip link set eth0 up
-    ip addr add 192.168.1.2/24 dev eth0
-    ip route add default via 192.168.1.1
+    # Check if IP is already assigned before adding it
+    if ! ip addr show dev eth0 | grep -q "192.168.1.2"; then
+        ip addr add 192.168.1.2/24 dev eth0
+    fi
+    # Check if default route exists before adding it
+    if ! ip route show | grep -q "default via 192.168.1.1"; then
+        ip route add default via 192.168.1.1
+    fi
     sleep 2
 done
 

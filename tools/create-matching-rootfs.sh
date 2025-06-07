@@ -252,6 +252,7 @@ TTYVHangup=no
 BindsTo=
 After=
 ConditionPathExists=
+EOF
     
     echo "Rootfs creation complete!"
 }

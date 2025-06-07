@@ -209,6 +209,7 @@ EOF
 [Unit]
 Description=/etc/rc.local Compatibility
 ConditionPathExists=/etc/rc.local
+After=network.target
 
 [Service]
 Type=forking
@@ -230,17 +231,28 @@ EOF
     mkdir -p "$ROOTFS_DIR/etc/systemd/system/getty.target.wants"
     ln -sf "/lib/systemd/system/serial-getty@.service" "$ROOTFS_DIR/etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service"
     
-    # Make sure systemd doesn't wait for the device
+    # Make sure systemd doesn't wait too long for devices
     mkdir -p "$ROOTFS_DIR/etc/systemd/system.conf.d"
     cat > "$ROOTFS_DIR/etc/systemd/system.conf.d/10-timeout.conf" << EOF
 [Manager]
-DefaultTimeoutStartSec=10s
-DefaultDeviceTimeoutSec=10s
+DefaultTimeoutStartSec=5s
+DefaultDeviceTimeoutSec=5s
+EOF
+
+    # Create udev rules for ttyS0
+    mkdir -p "$ROOTFS_DIR/etc/udev/rules.d"
+    cat > "$ROOTFS_DIR/etc/udev/rules.d/90-ttyS0.rules" << EOF
+KERNEL=="ttyS0", SYMLINK+="console", MODE="0666"
 EOF
     
     # Configure serial console properly for Firecracker
     mkdir -p "$ROOTFS_DIR/etc/systemd/system/serial-getty@ttyS0.service.d"
     cat > "$ROOTFS_DIR/etc/systemd/system/serial-getty@ttyS0.service.d/override.conf" << EOF
+[Unit]
+BindsTo=dev-ttyS0.device
+After=dev-ttyS0.device
+Wants=dev-ttyS0.device
+
 [Service]
 ExecStart=
 ExecStart=-/sbin/agetty --autologin root --noclear --keep-baud 115200,38400,9600 ttyS0 linux
@@ -249,9 +261,6 @@ Restart=always
 RestartSec=0
 TTYReset=no
 TTYVHangup=no
-BindsTo=
-After=
-ConditionPathExists=
 EOF
     
     echo "Rootfs creation complete!"

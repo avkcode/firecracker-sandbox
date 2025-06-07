@@ -194,6 +194,10 @@ build_kernel() {
     ./scripts/config --set-val CONFIG_BLK_DEV_INITRD y
     ./scripts/config --set-val CONFIG_INITRAMFS_SOURCE ""
     
+    # Add support for ext4 root filesystem
+    ./scripts/config --set-val CONFIG_EXT4_FS y
+    ./scripts/config --set-val CONFIG_EXT4_USE_FOR_EXT2 y
+    
     # Answer yes to all prompts during build
     echo "Ensuring all prompts are answered with 'y'..."
     sed -i 's/.*CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES.*/CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES=y/' .config

@@ -18,20 +18,35 @@ check_root() {
     fi
 }
 
-# Function to check available disk space
-check_disk_space() {
-    local required_space=5000  # 5GB in MB
-    local available_space=$(df -m . | awk 'NR==2 {print $4}')
+# Function to check system resources
+check_system_resources() {
+    # Check disk space
+    local required_disk_space=5000  # 5GB in MB
+    local available_disk_space=$(df -m . | awk 'NR==2 {print $4}')
     
-    echo "Available disk space: ${available_space}MB"
-    echo "Required disk space: ${required_space}MB"
+    echo "Available disk space: ${available_disk_space}MB"
+    echo "Required disk space: ${required_disk_space}MB"
     
-    if [ "$available_space" -lt "$required_space" ]; then
-        echo "ERROR: Not enough disk space. Need at least ${required_space}MB, but only ${available_space}MB available."
+    if [ "$available_disk_space" -lt "$required_disk_space" ]; then
+        echo "ERROR: Not enough disk space. Need at least ${required_disk_space}MB, but only ${available_disk_space}MB available."
         exit 1
     fi
     
-    echo "Disk space check passed."
+    # Check available memory
+    local required_memory=1024  # 1GB in MB
+    local available_memory=$(free -m | awk '/^Mem:/ {print $7}')
+    
+    echo "Available memory: ${available_memory}MB"
+    echo "Recommended memory: ${required_memory}MB"
+    
+    if [ "$available_memory" -lt "$required_memory" ]; then
+        echo "WARNING: Low memory detected. This might cause debootstrap to fail."
+        echo "Consider adding swap space or increasing available memory."
+        echo "Continuing anyway in 5 seconds..."
+        sleep 5
+    fi
+    
+    echo "System resource check completed."
 }
 
 # Function to install dependencies
@@ -53,13 +68,61 @@ create_rootfs() {
     echo "Running debootstrap to create a minimal Debian system..."
     echo "This may take a while..."
     
-    # Run debootstrap with verbose output and error handling
-    if ! debootstrap --verbose --variant=minbase --keyring=/usr/share/keyrings/debian-archive-keyring.gpg bullseye "$ROOTFS_DIR" http://deb.debian.org/debian; then
-        echo "ERROR: debootstrap failed. Check the output above for details."
+    # Create a temporary directory for debootstrap cache
+    DEBOOTSTRAP_CACHE="$(mktemp -d)"
+    echo "Using temporary cache directory: $DEBOOTSTRAP_CACHE"
+    
+    # Try debootstrap with different options and retry mechanism
+    MAX_RETRIES=3
+    RETRY_COUNT=0
+    SUCCESS=false
+    
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$SUCCESS" = false ]; do
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        echo "Attempt $RETRY_COUNT of $MAX_RETRIES..."
+        
+        # Clean up any partial installation
+        if [ -d "$ROOTFS_DIR/var" ]; then
+            echo "Cleaning up previous partial installation..."
+            rm -rf "$ROOTFS_DIR"/*
+        fi
+        
+        # Different approaches based on retry count
+        if [ $RETRY_COUNT -eq 1 ]; then
+            echo "Using standard debootstrap approach..."
+            debootstrap --verbose --variant=minbase --keyring=/usr/share/keyrings/debian-archive-keyring.gpg \
+                --cache-dir="$DEBOOTSTRAP_CACHE" bullseye "$ROOTFS_DIR" http://deb.debian.org/debian && SUCCESS=true
+        elif [ $RETRY_COUNT -eq 2 ]; then
+            echo "Using alternative mirror and increased verbosity..."
+            debootstrap --verbose --variant=minbase --keyring=/usr/share/keyrings/debian-archive-keyring.gpg \
+                --cache-dir="$DEBOOTSTRAP_CACHE" bullseye "$ROOTFS_DIR" http://ftp.debian.org/debian && SUCCESS=true
+        else
+            echo "Final attempt with minimal package set and debug options..."
+            DEBIAN_FRONTEND=noninteractive debootstrap --verbose --variant=minbase --include=systemd-sysv,iproute2 \
+                --exclude=tasksel,tasksel-data --keyring=/usr/share/keyrings/debian-archive-keyring.gpg \
+                --cache-dir="$DEBOOTSTRAP_CACHE" bullseye "$ROOTFS_DIR" http://deb.debian.org/debian && SUCCESS=true
+        fi
+        
+        if [ "$SUCCESS" = false ]; then
+            echo "Attempt $RETRY_COUNT failed. Waiting before retry..."
+            sleep 5
+        fi
+    done
+    
+    # Clean up cache directory
+    rm -rf "$DEBOOTSTRAP_CACHE"
+    
+    if [ "$SUCCESS" = false ]; then
+        echo "ERROR: debootstrap failed after $MAX_RETRIES attempts."
         echo "Common issues include:"
-        echo "  - Insufficient disk space"
+        echo "  - Insufficient disk space or memory"
         echo "  - Network connectivity problems"
         echo "  - Corrupt package files"
+        echo ""
+        echo "Try the following:"
+        echo "  1. Add swap space: sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile"
+        echo "  2. Use a different Debian mirror"
+        echo "  3. Run with --no-check-gpg option if keyring issues persist"
         exit 1
     fi
     
@@ -175,8 +238,8 @@ echo "===== Debian Rootfs Creation Script for Firecracker ====="
 # Check if running as root
 check_root
 
-# Check available disk space
-check_disk_space
+# Check system resources
+check_system_resources
 
 # Install dependencies
 install_dependencies

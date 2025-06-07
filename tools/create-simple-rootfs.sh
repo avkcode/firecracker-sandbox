@@ -54,14 +54,25 @@ EOF
     # Create init script
     cat > "$ROOTFS_DIR/init" << EOF
 #!/bin/sh
+# Mount essential filesystems
 mount -t proc proc /proc
 mount -t sysfs sysfs /sys
-mount -t devtmpfs devtmpfs /dev
+mount -t devtmpfs devtmpfs /dev 2>/dev/null || echo "devtmpfs mount failed"
+
+# Debug information
+echo "Kernel version: \$(uname -r)"
+echo "Available block devices:"
+ls -la /dev/vd* 2>/dev/null || echo "No virtio block devices found"
+cat /proc/partitions
+
+# Create device nodes if they don't exist
+[ ! -e /dev/vda ] && mknod -m 660 /dev/vda b 254 0
+[ ! -e /dev/vda1 ] && mknod -m 660 /dev/vda1 b 254 1
 
 # Configure network
-ip link set eth0 up
-ip addr add 192.168.1.2/24 dev eth0
-ip route add default via 192.168.1.1
+ip link set eth0 up 2>/dev/null || echo "Network setup failed"
+ip addr add 192.168.1.2/24 dev eth0 2>/dev/null
+ip route add default via 192.168.1.1 2>/dev/null
 
 # Set up DNS
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
@@ -103,6 +114,41 @@ create_ext4_image() {
     mknod -m 666 /mnt/rootfs/dev/tty c 5 0
     mknod -m 444 /mnt/rootfs/dev/random c 1 8
     mknod -m 444 /mnt/rootfs/dev/urandom c 1 9
+    
+    # Create virtio block device nodes
+    echo "Creating virtio block device nodes..."
+    mkdir -p /mnt/rootfs/dev/block
+    mknod -m 660 /mnt/rootfs/dev/vda b 254 0
+    
+    # Create a more robust init script
+    cat > /mnt/rootfs/init << 'EOF'
+#!/bin/sh
+# Mount essential filesystems
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev || mknod -m 660 /dev/vda b 254 0
+
+# Debug information
+echo "Kernel version: $(uname -r)"
+echo "Available block devices:"
+ls -la /dev/vd* /dev/block/* 2>/dev/null || echo "No block devices found"
+cat /proc/partitions
+
+# Configure network
+ip link set eth0 up
+ip addr add 192.168.1.2/24 dev eth0
+ip route add default via 192.168.1.1
+
+# Set up DNS
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
+
+echo "Firecracker VM is running!"
+echo "Type 'poweroff' to exit"
+
+# Start a shell
+exec /bin/sh
+EOF
+    chmod +x /mnt/rootfs/init
     
     echo "Unmounting image..."
     umount /mnt/rootfs

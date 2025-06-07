@@ -183,6 +183,17 @@ build_kernel() {
     ./scripts/config --set-val CONFIG_MD n
     ./scripts/config --set-val CONFIG_MD_AUTODETECT n
     
+    # Additional critical virtio options
+    ./scripts/config --set-val CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES y
+    ./scripts/config --set-val CONFIG_VIRTIO_BLK_MQ y
+    
+    # Block device debugging
+    ./scripts/config --set-val CONFIG_BLK_DEBUG_FS y
+    
+    # Ensure initramfs/initrd support
+    ./scripts/config --set-val CONFIG_BLK_DEV_INITRD y
+    ./scripts/config --set-val CONFIG_INITRAMFS_SOURCE ""
+    
     # Answer yes to all prompts during build
     echo "Ensuring all prompts are answered with 'y'..."
     sed -i 's/.*CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES.*/CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES=y/' .config

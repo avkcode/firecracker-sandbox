@@ -230,32 +230,28 @@ EOF
     mkdir -p "$ROOTFS_DIR/etc/systemd/system/getty.target.wants"
     ln -sf "/lib/systemd/system/serial-getty@.service" "$ROOTFS_DIR/etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service"
     
-    # Create a custom systemd service for ttyS0
-    cat > "$ROOTFS_DIR/etc/systemd/system/getty@ttyS0.service" << EOF
-[Unit]
-Description=Serial Console Service for ttyS0
-BindsTo=dev-ttyS0.device
-After=dev-ttyS0.device systemd-user-sessions.service plymouth-quit-wait.service getty-pre.target
-After=rc-local.service
-Before=getty.target
-IgnoreOnIsolate=yes
-
+    # Make sure systemd doesn't wait for the device
+    mkdir -p "$ROOTFS_DIR/etc/systemd/system.conf.d"
+    cat > "$ROOTFS_DIR/etc/systemd/system.conf.d/10-timeout.conf" << EOF
+[Manager]
+DefaultTimeoutStartSec=10s
+DefaultDeviceTimeoutSec=10s
+EOF
+    
+    # Configure serial console properly for Firecracker
+    mkdir -p "$ROOTFS_DIR/etc/systemd/system/serial-getty@ttyS0.service.d"
+    cat > "$ROOTFS_DIR/etc/systemd/system/serial-getty@ttyS0.service.d/override.conf" << EOF
 [Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --noclear --keep-baud 115200,38400,9600 ttyS0 linux
 Type=idle
 Restart=always
 RestartSec=0
-ExecStart=/sbin/agetty --autologin root -L ttyS0 115200 linux
-UtmpIdentifier=ttyS0
-TTYPath=/dev/ttyS0
-TTYReset=yes
-TTYVHangup=yes
-
-[Install]
-WantedBy=getty.target
-EOF
-
-    # Enable the custom service
-    ln -sf "/etc/systemd/system/getty@ttyS0.service" "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/getty@ttyS0.service"
+TTYReset=no
+TTYVHangup=no
+BindsTo=
+After=
+ConditionPathExists=
     
     echo "Rootfs creation complete!"
 }

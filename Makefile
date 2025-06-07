@@ -111,3 +111,8 @@ build-simple-rootfs:
 .PHONY: build-all
 build-all: build-kernel build-simple-rootfs
 	@echo "Build complete. Kernel and rootfs are ready for Firecracker."
+
+.PHONY: rebuild-and-run
+rebuild-and-run: build-simple-rootfs down net-down net-up
+	@echo "Rebuilding rootfs and restarting Firecracker..."
+	@firecracker --api-sock /tmp/firecracker.socket --config-file vm-config.json

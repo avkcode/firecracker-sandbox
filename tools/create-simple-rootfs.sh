@@ -52,7 +52,7 @@ create_rootfs() {
 EOF
     
     # Create init script
-    cat > "$ROOTFS_DIR/init" << EOF
+    cat > "$ROOTFS_DIR/init" << 'EOF'
 #!/bin/sh
 # Mount essential filesystems
 mount -t proc proc /proc
@@ -60,7 +60,7 @@ mount -t sysfs sysfs /sys
 mount -t devtmpfs devtmpfs /dev 2>/dev/null || echo "devtmpfs mount failed"
 
 # Debug information
-echo "Kernel version: \$(uname -r)"
+echo "Kernel version: $(uname -r)"
 echo "Available block devices:"
 ls -la /dev/vd* 2>/dev/null || echo "No virtio block devices found"
 cat /proc/partitions
@@ -76,6 +76,31 @@ ip route add default via 192.168.1.1 2>/dev/null
 
 # Set up DNS
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
+
+# Create a more user-friendly environment
+mkdir -p /tmp /var/log /var/run
+chmod 1777 /tmp
+
+# Create a welcome message
+cat > /etc/motd << MOTD
+=======================================================
+Welcome to Firecracker MicroVM!
+=======================================================
+
+Network: 192.168.1.2/24 (Gateway: 192.168.1.1)
+DNS: 8.8.8.8
+
+Commands:
+  - ping 8.8.8.8     - Test network connectivity
+  - uname -a         - Show kernel information
+  - poweroff         - Shutdown the VM
+
+=======================================================
+MOTD
+
+# Display welcome message
+cat /etc/motd
+echo ""
 
 echo "Firecracker VM is running!"
 echo "Type 'poweroff' to exit"

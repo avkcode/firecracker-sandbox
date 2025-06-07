@@ -53,7 +53,8 @@ ff02::1         ip6-allnodes
 ff02::2         ip6-allrouters
 EOF
     
-    # Configure network interfaces
+    # Create network directory and configure network interfaces
+    mkdir -p "$ROOTFS_DIR/etc/network"
     cat > "$ROOTFS_DIR/etc/network/interfaces" << EOF
 # The loopback network interface
 auto lo

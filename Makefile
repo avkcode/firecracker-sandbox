@@ -16,6 +16,10 @@ help:
 	@echo "  up          - Start the Firecracker MicroVM using the configuration in config.json."
 	@echo "  down        - Stop all Firecracker instances and clean up resources."
 	@echo "                Includes stopping the VM, cleaning up networking, and deactivating the API socket."
+	@echo "  build-kernel - Download and build the latest stable Linux kernel for Firecracker."
+	@echo "  build-rootfs - Create a Debian rootfs that matches the latest kernel."
+	@echo "  build-all    - Build both the kernel and rootfs for Firecracker."
+	@echo "  login       - Attempt to log into the running MicroVM via serial console."
 	@echo "  help        - Show this help message."
 
 .PHONY: activate
@@ -88,3 +92,17 @@ login:
 	@echo "Connecting to the MicroVM via serial console..."
 	@screen /dev/ttyS0 115200 || true
 	@echo "Login attempt complete."
+
+.PHONY: build-kernel
+build-kernel:
+	@echo "Building the latest stable Linux kernel for Firecracker..."
+	@bash tools/build-latest-kernel.sh
+
+.PHONY: build-rootfs
+build-rootfs:
+	@echo "Creating a Debian rootfs that matches the latest kernel..."
+	@sudo bash tools/create-matching-rootfs.sh
+
+.PHONY: build-all
+build-all: build-kernel build-rootfs
+	@echo "Build complete. Kernel and rootfs are ready for Firecracker."

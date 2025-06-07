@@ -35,11 +35,13 @@ create_rootfs() {
     cp "$(which busybox)" "$ROOTFS_DIR/bin/"
     
     # Create symlinks for busybox
-    cd "$ROOTFS_DIR/bin"
+    pushd "$ROOTFS_DIR/bin" > /dev/null
     for cmd in $(./busybox --list); do
-        ln -sf busybox "$cmd"
+        if [ "$cmd" != "busybox" ]; then
+            ln -sf busybox "$cmd"
+        fi
     done
-    cd -
+    popd > /dev/null
     
     # Create basic configuration files
     echo "firecracker-vm" > "$ROOTFS_DIR/etc/hostname"

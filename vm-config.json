@@ -1,7 +1,7 @@
 {
   "boot-source": {
     "kernel_image_path": "./vmlinux",
-    "boot_args": "console=ttyS0 noapic reboot=k panic=1 pci=off root=/dev/vda rootfstype=ext4 rw init=/bin/sh rootflags=data=ordered"
+    "boot_args": "console=ttyS0 noapic reboot=k panic=1 pci=off root=/dev/vda rootfstype=ext4 rw init=/init rootflags=data=ordered"
   },
   "drives": [
     {

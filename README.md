@@ -78,9 +78,7 @@ make down
 | `snapshot`        | Create a snapshot of the running MicroVM.                             |
 | `restore`         | Restore a MicroVM from a snapshot (use with SNAPSHOT=name).           |
 | `build-kernel`    | Build the latest stable Linux kernel for Firecracker.                 |
-| `build-simple-rootfs` | Create a simple Debian rootfs with systemd.                       |
 | `build-all`       | Build both kernel and rootfs for Firecracker.                         |
-| `install-init-script` | Install a fallback init script to the rootfs.                     |
 | `help`            | Show help message with available targets.                             |
 
 ## Example Workflow
@@ -107,7 +105,7 @@ make restore SNAPSHOT=20250609_123456
 
 ## Ensuring Network Functionality in the VM
 
-The rootfs created with `build-simple-rootfs` is pre-configured with networking. If you're using a custom rootfs, configure networking inside the VM:
+The rootfs created with `tools/create-matching-rootfs.sh` is pre-configured with networking. If you're using a custom rootfs, configure networking inside the VM:
 
 ```
 # Assign an IP address to the eth0 interface

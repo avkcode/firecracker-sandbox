@@ -19,7 +19,7 @@ This project provides a set of `Makefile` targets to simplify the setup, managem
   - `iproute2`
   - `screen`
   - `sudo` privileges
-- **Configuration File**: Ensure you have a valid `vm-config.json` file for Firecracker.
+- **Configuration File**: Ensure you have a valid `vm-config.json` file for Firecracker. This is required before starting the MicroVM.
 
 ## Usage
 

@@ -1,7 +1,24 @@
 {
   "boot-source": {
     "kernel_image_path": "./vmlinux",
-    "boot_args": "console=ttyS0 noapic reboot=k panic=1 pci=off root=/dev/vda rootfstype=ext4 rw init=/sbin/init"
+    "boot_args": "console=ttyS0 reboot=k panic=1 pci=off root=/dev/vda rw rootfstype=ext4 init=/lib/systemd/systemd nomodeset systemd.unified_cgroup_hierarchy=0"
+  },
+  "fs": {
+    "virtiofs": [
+      {
+        "id": "shared_dir",
+        "path_on_host": ".",
+        "mount_tag": "shared",
+        "num_queues": 1,
+        "queue_size": 1024
+      }
+    ]
+  },
+  "logger": {
+    "log_path": "firecracker.log",
+    "level": "Debug",
+    "show_level": true,
+    "show_log_origin": true
   },
   "drives": [
     {
@@ -12,8 +29,8 @@
     }
   ],
   "machine-config": {
-    "vcpu_count": 4,
-    "mem_size_mib": 9096
+    "vcpu_count": 2,
+    "mem_size_mib": 1024
   },
   "network-interfaces": [
     {
@@ -21,5 +38,10 @@
       "host_dev_name": "tap0",
       "guest_mac": "06:00:00:00:00:01"
     }
-  ]
+  ],
+  "vsock": {
+    "vsock_id": "vsock0",
+    "guest_cid": 3,
+    "uds_path": "./vsock.sock"
+  }
 }

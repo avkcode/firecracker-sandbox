@@ -36,7 +36,7 @@ def check_linux() -> bool:
 def check_dependencies() -> Tuple[bool, List[str]]:
     """Check for required dependencies."""
     missing = []
-    required = ['curl', 'grep', 'systemctl']
+    required = ['curl', 'grep']
     
     for dep in required:
         if not shutil.which(dep):
@@ -105,40 +105,68 @@ def download_with_progress(url: str, dest: str) -> bool:
         print_color(f"\nDownload failed: {e}", Colors.FAIL)
         return False
 
+def check_sudo_available() -> bool:
+    """Check if sudo is available on the system."""
+    return shutil.which("sudo") is not None
+
 def install_gitlab_runner_package(distro: str, arch: str) -> bool:
     """Install GitLab Runner using the official repository."""
     try:
         print_color("\nAdding GitLab Runner repository...", Colors.HEADER)
         
+        # Check if sudo is available
+        sudo_available = check_sudo_available()
+        sudo_prefix = ["sudo"] if sudo_available else []
+        
         # Add repository
         if distro == 'deb':
             # For Debian/Ubuntu
-            repo_script = """
-            curl -L "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh" | sudo bash
-            """
-            subprocess.run(
-                ["bash", "-c", repo_script],
-                check=True
-            )
+            if sudo_available:
+                repo_script = """
+                curl -L "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh" | sudo bash
+                """
+                subprocess.run(
+                    ["bash", "-c", repo_script],
+                    check=True
+                )
+            else:
+                repo_script = """
+                curl -L "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh" | bash
+                """
+                subprocess.run(
+                    ["bash", "-c", repo_script],
+                    check=True
+                )
             
             # Install package
+            install_cmd = sudo_prefix + ["apt-get", "install", "-y", "gitlab-runner"]
             subprocess.run(
-                ["sudo", "apt-get", "install", "-y", "gitlab-runner"],
+                install_cmd,
                 check=True
             )
         else:
             # For RHEL/CentOS/Fedora
-            repo_script = """
-            curl -L "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.rpm.sh" | sudo bash
-            """
-            subprocess.run(
-                ["bash", "-c", repo_script],
-                check=True
-            )
+            if sudo_available:
+                repo_script = """
+                curl -L "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.rpm.sh" | sudo bash
+                """
+                subprocess.run(
+                    ["bash", "-c", repo_script],
+                    check=True
+                )
+            else:
+                repo_script = """
+                curl -L "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.rpm.sh" | bash
+                """
+                subprocess.run(
+                    ["bash", "-c", repo_script],
+                    check=True
+                )
             
             # Install package
+            install_cmd = sudo_prefix + ["yum", "install", "-y", "gitlab-runner"]
             subprocess.run(
-                ["sudo", "yum", "install", "-y", "gitlab-runner"],
+                install_cmd,
                 check=True
             )
         
@@ -159,8 +187,12 @@ def register_runner(
     try:
         print_color("\nRegistering GitLab Runner...", Colors.HEADER)
         
-        cmd = [
-            "sudo", "gitlab-runner", "register",
+        # Check if sudo is available
+        sudo_available = check_sudo_available()
+        sudo_prefix = ["sudo"] if sudo_available else []
+        
+        cmd = sudo_prefix + [
+            "gitlab-runner", "register",
             "--non-interactive",
             "--url", url,
             "--registration-token", registration_token,
@@ -231,10 +263,11 @@ def install_gitlab_runner(
         
         print_color("\nGitLab Runner installation complete!", Colors.OKGREEN)
         print("Available commands:")
-        print("  sudo gitlab-runner start    # Start the runner")
-        print("  sudo gitlab-runner stop     # Stop the runner")
-        print("  sudo gitlab-runner status   # Check runner status")
-        print("  sudo gitlab-runner --help  # Show all commands")
+        sudo_cmd = "sudo " if check_sudo_available() else ""
+        print(f"  {sudo_cmd}gitlab-runner start    # Start the runner")
+        print(f"  {sudo_cmd}gitlab-runner stop     # Stop the runner")
+        print(f"  {sudo_cmd}gitlab-runner status   # Check runner status")
+        print(f"  {sudo_cmd}gitlab-runner --help  # Show all commands")
         
         return True
         
@@ -250,7 +283,7 @@ def main():
     if not deps_ok:
         print_color(
             f"Missing dependencies: {', '.join(missing_deps)}\n"
-            "Please install them first (e.g., 'sudo apt install curl grep systemd')",
+            "Please install them first (e.g., 'apt install curl grep')",
             Colors.FAIL
         )
         sys.exit(1)

@@ -1,10 +1,21 @@
 {
   "boot-source": {
     "kernel_image_path": "./vmlinux",
-    "boot_args": "console=ttyS0 reboot=k panic=1 pci=off root=/dev/vda rw rootfstype=ext4 virtio_mmio.device=4K@0xd0000000:5 virtio_mmio.device=4K@0xd0001000:6 virtio_mmio.device=4K@0xd0002000:7 init=/lib/systemd/systemd systemd.journald.forward_to_console=1 systemd.unit=multi-user.target nomodeset systemd.mask=serial-getty@ttyS0.service devpts=newinstance"
+    "boot_args": "console=ttyS0 reboot=k panic=1 pci=off root=/dev/vda rw rootfstype=ext4 init=/lib/systemd/systemd nomodeset systemd.unified_cgroup_hierarchy=0"
+  },
+  "fs": {
+    "virtiofs": [
+      {
+        "id": "shared_dir",
+        "path_on_host": ".",
+        "mount_tag": "shared",
+        "num_queues": 1,
+        "queue_size": 1024
+      }
+    ]
   },
   "logger": {
-    "log_path": "./firecracker.log",
+    "log_path": "firecracker.log",
     "level": "Debug",
     "show_level": true,
     "show_log_origin": true

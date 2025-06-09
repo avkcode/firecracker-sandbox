@@ -131,6 +131,117 @@ When connected to the VM console via `make login`, you can exit without shutting
 2. This returns you to your host shell while leaving the VM running
 3. You can reconnect later with `make login`
 
+## Monitoring Network Traffic
+
+You can monitor network traffic within your Firecracker MicroVM using tools like `tcpdump` or `tshark`. This is useful for debugging network issues, analyzing protocols, or monitoring communication between services.
+
+### Using tcpdump
+
+1. First, install tcpdump inside the VM:
+```
+apt-get update
+apt-get install -y tcpdump
+```
+
+2. Basic usage to capture traffic on the eth0 interface:
+```
+# Capture and display packets in real-time
+tcpdump -i eth0
+
+# Capture specific protocols (e.g., HTTP traffic)
+tcpdump -i eth0 port 80
+
+# Save captures to a file for later analysis
+tcpdump -i eth0 -w capture.pcap
+
+# Capture with verbose output and readable timestamps
+tcpdump -i eth0 -v -tttt
+```
+
+### Using Wireshark/tshark
+
+For more advanced analysis, you can use tshark (command-line version of Wireshark):
+
+1. Install tshark inside the VM:
+```
+apt-get update
+apt-get install -y tshark
+```
+
+2. Basic usage:
+```
+# Capture packets with detailed protocol information
+tshark -i eth0
+
+# Filter for specific protocols
+tshark -i eth0 -f "port 443"
+
+# Save capture to a file in Wireshark format
+tshark -i eth0 -w capture.pcapng
+
+# Analyze a previously saved capture file
+tshark -r capture.pcapng
+```
+
+### Remote Analysis Workflow
+
+For more detailed analysis with the Wireshark GUI:
+
+1. Capture traffic inside the VM:
+```
+tcpdump -i eth0 -w /tmp/capture.pcap
+```
+
+2. Copy the capture file to your host:
+```
+# From your host machine
+scp root@192.168.1.2:/tmp/capture.pcap ./
+```
+
+3. Open the capture file with Wireshark on your host system for detailed analysis.
+
+### Monitoring Traffic from the Host Machine
+
+You can also monitor the VM's network traffic directly from the host machine:
+
+1. Install tcpdump on the host:
+```
+sudo apt-get update
+sudo apt-get install -y tcpdump
+```
+
+2. Monitor traffic on the tap interface:
+```
+# Monitor all traffic on the tap0 interface
+sudo tcpdump -i tap0
+
+# Filter traffic to/from the VM's IP address
+sudo tcpdump -i tap0 host 192.168.1.2
+
+# Monitor specific ports
+sudo tcpdump -i tap0 host 192.168.1.2 and port 80
+```
+
+3. For continuous monitoring with real-time statistics:
+```
+# Install iftop
+sudo apt-get install -y iftop
+
+# Monitor bandwidth usage on tap0
+sudo iftop -i tap0
+```
+
+4. Using Wireshark on the host:
+```
+# Install Wireshark
+sudo apt-get install -y wireshark
+
+# Capture traffic (requires root)
+sudo wireshark -i tap0 -k
+```
+
+This approach allows you to monitor VM traffic without installing additional tools inside the VM or interrupting its operation.
+
 ## Setting Up SSH Access
 
 To enable SSH access to your Firecracker MicroVM:

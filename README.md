@@ -1,3 +1,5 @@
+[Secure CI/CD Isolation With Firecracker And Wireguard](https://medium.com/@antonvkrylov/secure-ci-cd-isolation-with-firecracker-and-wireguard-2df3aef6c64a)
+
 # Firecracker MicroVM Sandbox
 
 This project provides a set of `Makefile` targets to simplify the setup, management, and cleanup of Firecracker MicroVMs. It includes networking configuration, VM lifecycle commands, and console access.

@@ -32,8 +32,8 @@ Firecracker requires a bootable rootfs image and Linux Kernel. You have several 
 # Build the latest stable kernel
 make build-kernel
 
-# Create a simple rootfs (requires sudo)
-make build-simple-rootfs
+# Create a rootfs (requires sudo)
+make build-rootfs
 
 # Or build both at once
 make build-all
